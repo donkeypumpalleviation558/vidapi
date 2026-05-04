@@ -4,7 +4,7 @@
 **Sessions**: 5 (initial estimate)
 **Estimated Duration**: 10-20 hours
 
-**Progress**: 1/5 sessions (20%)
+**Progress**: 2/5 sessions (40%)
 
 ---
 
@@ -19,7 +19,7 @@ Prove the core JSON-to-video loop locally. Build the FastAPI skeleton, Pydantic 
 | Session | Name | Status | Est. Tasks | Validated |
 |---------|------|--------|------------|-----------|
 | 01 | Project Skeleton and Config | Complete | 20 | 2026-05-05 |
-| 02 | Composition Schema and DB Models | Not Started | ~15-20 | - |
+| 02 | Composition Schema and DB Models | Complete | 20 | 2026-05-05 |
 | 03 | Storage and Asset Service | Not Started | ~15-20 | - |
 | 04 | Editly Renderer and Segment Compiler | Not Started | ~20-25 | - |
 | 05 | Render Service and API Endpoints | Not Started | ~15-20 | - |
@@ -29,12 +29,13 @@ Prove the core JSON-to-video loop locally. Build the FastAPI skeleton, Pydantic 
 ## Completed Sessions
 
 - **Session 01: Project Skeleton and Config** -- Completed 2026-05-05. Delivered FastAPI skeleton with health endpoint, config system, structured logging, error handling, dev tooling (ruff, mypy, pytest), 20/20 tasks, 13/13 tests.
+- **Session 02: Composition Schema and DB Models** -- Completed 2026-05-05. Delivered Pydantic v2 composition schema with discriminated unions for 5 asset types, Output model with resolution presets and quality mapping, Render SQLModel with status state machine, Alembic migration infrastructure, 20/20 tasks, 82/82 tests.
 
 ---
 
 ## Upcoming Sessions
 
-- Session 02: Composition Schema and DB Models
+- Session 03: Storage and Asset Service
 
 ---
 

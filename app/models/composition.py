@@ -1,0 +1,332 @@
+from __future__ import annotations
+
+from enum import StrEnum
+from typing import Annotated, Literal
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    field_validator,
+    model_validator,
+)
+
+# ---------------------------------------------------------------------------
+# Enums
+# ---------------------------------------------------------------------------
+
+class FitMode(StrEnum):
+    COVER = "cover"
+    CONTAIN = "contain"
+    STRETCH = "stretch"
+    NONE = "none"
+
+
+class OutputFormat(StrEnum):
+    MP4 = "mp4"
+    GIF = "gif"
+    WEBM = "webm"
+    PNG_SEQUENCE = "png-sequence"
+
+
+class ResolutionPreset(StrEnum):
+    R360 = "360"
+    R480 = "480"
+    R720 = "720"
+    R1080 = "1080"
+    R4K = "4k"
+
+
+class AspectRatio(StrEnum):
+    AR_16_9 = "16:9"
+    AR_9_16 = "9:16"
+    AR_1_1 = "1:1"
+    AR_4_5 = "4:5"
+
+
+class QualityPreset(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class NamedPosition(StrEnum):
+    CENTER = "center"
+    TOP = "top"
+    BOTTOM = "bottom"
+    LEFT = "left"
+    RIGHT = "right"
+    TOP_LEFT = "top-left"
+    TOP_RIGHT = "top-right"
+    BOTTOM_LEFT = "bottom-left"
+    BOTTOM_RIGHT = "bottom-right"
+
+
+class AudioEffect(StrEnum):
+    FADE_IN = "fadeIn"
+    FADE_OUT = "fadeOut"
+    FADE_IN_FADE_OUT = "fadeInFadeOut"
+
+
+# ---------------------------------------------------------------------------
+# Resolution preset lookup
+# ---------------------------------------------------------------------------
+
+RESOLUTION_TABLE: dict[tuple[ResolutionPreset, AspectRatio], tuple[int, int]] = {
+    (ResolutionPreset.R360, AspectRatio.AR_16_9): (640, 360),
+    (ResolutionPreset.R360, AspectRatio.AR_9_16): (360, 640),
+    (ResolutionPreset.R360, AspectRatio.AR_1_1): (360, 360),
+    (ResolutionPreset.R360, AspectRatio.AR_4_5): (360, 450),
+    (ResolutionPreset.R480, AspectRatio.AR_16_9): (854, 480),
+    (ResolutionPreset.R480, AspectRatio.AR_9_16): (480, 854),
+    (ResolutionPreset.R480, AspectRatio.AR_1_1): (480, 480),
+    (ResolutionPreset.R480, AspectRatio.AR_4_5): (480, 600),
+    (ResolutionPreset.R720, AspectRatio.AR_16_9): (1280, 720),
+    (ResolutionPreset.R720, AspectRatio.AR_9_16): (720, 1280),
+    (ResolutionPreset.R720, AspectRatio.AR_1_1): (720, 720),
+    (ResolutionPreset.R720, AspectRatio.AR_4_5): (720, 900),
+    (ResolutionPreset.R1080, AspectRatio.AR_16_9): (1920, 1080),
+    (ResolutionPreset.R1080, AspectRatio.AR_9_16): (1080, 1920),
+    (ResolutionPreset.R1080, AspectRatio.AR_1_1): (1080, 1080),
+    (ResolutionPreset.R1080, AspectRatio.AR_4_5): (1080, 1350),
+    (ResolutionPreset.R4K, AspectRatio.AR_16_9): (3840, 2160),
+    (ResolutionPreset.R4K, AspectRatio.AR_9_16): (2160, 3840),
+    (ResolutionPreset.R4K, AspectRatio.AR_1_1): (2160, 2160),
+    (ResolutionPreset.R4K, AspectRatio.AR_4_5): (2160, 2700),
+}
+
+
+# ---------------------------------------------------------------------------
+# Quality preset lookup
+# ---------------------------------------------------------------------------
+
+QUALITY_TABLE: dict[QualityPreset, tuple[int, str]] = {
+    QualityPreset.LOW: (28, "veryfast"),
+    QualityPreset.MEDIUM: (23, "medium"),
+    QualityPreset.HIGH: (18, "slow"),
+}
+
+
+def resolve_quality(quality: QualityPreset) -> tuple[int, str]:
+    """Return (crf, ffmpeg_preset) for a quality preset."""
+    return QUALITY_TABLE[quality]
+
+
+def resolve_resolution(
+    resolution: ResolutionPreset,
+    aspect_ratio: AspectRatio,
+) -> tuple[int, int]:
+    """Return (width, height) for a resolution + aspect ratio pair."""
+    key = (resolution, aspect_ratio)
+    if key not in RESOLUTION_TABLE:
+        msg = (
+            f"No resolution mapping for {resolution.value} "
+            f"at {aspect_ratio.value}"
+        )
+        raise ValueError(msg)
+    return RESOLUTION_TABLE[key]
+
+
+# ---------------------------------------------------------------------------
+# Value Objects (frozen / immutable)
+# ---------------------------------------------------------------------------
+
+class CoordinatePosition(BaseModel):
+    """Normalized (0.0-1.0) coordinate pair."""
+    model_config = ConfigDict(frozen=True)
+
+    x: float = Field(ge=0.0, le=1.0)
+    y: float = Field(ge=0.0, le=1.0)
+
+
+Position = NamedPosition | CoordinatePosition
+
+
+class Offset(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    x: float = 0.0
+    y: float = 0.0
+
+
+class Transition(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    name: str = "fade"
+    duration: float = Field(default=1.0, gt=0.0)
+
+
+class Transform(BaseModel):
+    """Placeholder for rotation/skew/keyframe support."""
+    model_config = ConfigDict(frozen=True)
+
+    rotation: float = 0.0
+    skew_x: float = 0.0
+    skew_y: float = 0.0
+
+
+# ---------------------------------------------------------------------------
+# Asset types (discriminated union on `type`)
+# ---------------------------------------------------------------------------
+
+class VideoAsset(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["video"]
+    src: str
+    trim: float | None = None
+    volume: float = Field(default=1.0, ge=0.0, le=1.0)
+
+
+class ImageAsset(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["image"]
+    src: str
+
+
+class TextAsset(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["text"]
+    text: str
+    font_family: str = "Inter"
+    font_size: int = Field(default=48, gt=0)
+    color: str = "#ffffff"
+    background: str | None = None
+    padding: int = Field(default=0, ge=0)
+    line_height: float = Field(default=1.2, gt=0.0)
+    align: Literal["left", "center", "right"] = "center"
+
+
+class AudioAsset(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["audio"]
+    src: str
+    trim: float | None = None
+    volume: float = Field(default=1.0, ge=0.0, le=1.0)
+    effect: AudioEffect | None = None
+
+
+class ColorAsset(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["color"]
+    color: str = "#000000"
+
+
+Asset = Annotated[
+    VideoAsset | ImageAsset | TextAsset | AudioAsset | ColorAsset,
+    Field(discriminator="type"),
+]
+
+
+# ---------------------------------------------------------------------------
+# Clip
+# ---------------------------------------------------------------------------
+
+class Clip(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    asset: Asset
+    start: float = Field(default=0.0, ge=0.0)
+    length: float = Field(gt=0.0)
+    fit: FitMode = FitMode.COVER
+    position: Position = NamedPosition.CENTER
+    offset: Offset | None = None
+    scale: float = Field(default=1.0, gt=0.0)
+    opacity: float = Field(default=1.0, ge=0.0, le=1.0)
+    transition: Transition | None = None
+    transform: Transform | None = None
+
+    @field_validator("position", mode="before")
+    @classmethod
+    def _parse_position(cls, v: object) -> object:
+        if isinstance(v, str):
+            return NamedPosition(v)
+        return v
+
+
+# ---------------------------------------------------------------------------
+# Track / Timeline
+# ---------------------------------------------------------------------------
+
+class Track(BaseModel):
+    clips: list[Clip] = Field(min_length=1)
+
+
+class Timeline(BaseModel):
+    background: str = "#000000"
+    tracks: list[Track] = Field(min_length=1)
+    soundtrack: AudioAsset | None = None
+
+
+# ---------------------------------------------------------------------------
+# Output
+# ---------------------------------------------------------------------------
+
+class Output(BaseModel):
+    format: OutputFormat = OutputFormat.MP4
+    width: int | None = Field(default=None, gt=0)
+    height: int | None = Field(default=None, gt=0)
+    resolution: ResolutionPreset | None = None
+    aspect_ratio: AspectRatio | None = None
+    fps: int = Field(default=30, gt=0, le=60)
+    quality: QualityPreset = QualityPreset.MEDIUM
+
+    @model_validator(mode="after")
+    def _resolve_dimensions(self) -> Output:
+        if self.width is not None and self.height is not None:
+            return self
+        if self.resolution is not None and self.aspect_ratio is not None:
+            w, h = resolve_resolution(self.resolution, self.aspect_ratio)
+            object.__setattr__(self, "width", w)
+            object.__setattr__(self, "height", h)
+            return self
+        if self.resolution is not None and self.aspect_ratio is None:
+            ar = AspectRatio.AR_16_9
+            w, h = resolve_resolution(self.resolution, ar)
+            object.__setattr__(self, "width", w)
+            object.__setattr__(self, "height", h)
+            return self
+        if self.width is None and self.height is None:
+            object.__setattr__(self, "width", 1920)
+            object.__setattr__(self, "height", 1080)
+        return self
+
+    @property
+    def crf(self) -> int:
+        return resolve_quality(self.quality)[0]
+
+    @property
+    def ffmpeg_preset(self) -> str:
+        return resolve_quality(self.quality)[1]
+
+
+# ---------------------------------------------------------------------------
+# Renderer selector
+# ---------------------------------------------------------------------------
+
+RendererChoice = Literal["auto", "editly", "ffmpeg-native", "hyperframes"]
+
+
+# ---------------------------------------------------------------------------
+# Composition (top-level)
+# ---------------------------------------------------------------------------
+
+class Composition(BaseModel):
+    timeline: Timeline
+    output: Output = Field(default_factory=Output)
+    merge: dict[str, str | int | float | bool] | None = None
+    callback: HttpUrl | None = None
+    renderer: RendererChoice | None = None
+
+    @model_validator(mode="after")
+    def _validate_timeline_has_content(self) -> Composition:
+        for track in self.timeline.tracks:
+            if track.clips:
+                return self
+        msg = "Timeline must contain at least one track with at least one clip"
+        raise ValueError(msg)

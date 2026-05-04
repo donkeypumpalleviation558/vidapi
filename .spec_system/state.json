@@ -34,7 +34,8 @@
     }
   },
   "completed_sessions": [
-    "phase00-session01-project-skeleton-and-config"
+    "phase00-session01-project-skeleton-and-config",
+    "phase00-session02-composition-schema-and-db-models"
   ],
   "next_session_history": [
     {
@@ -45,6 +46,21 @@
     {
       "date": "2026-05-05",
       "session": "phase00-session01-project-skeleton-and-config",
+      "status": "completed"
+    },
+    {
+      "date": "2026-05-05",
+      "session": "phase00-session02-composition-schema-and-db-models",
+      "status": "planned"
+    },
+    {
+      "date": "2026-05-05",
+      "session": "phase00-session02-composition-schema-and-db-models",
+      "status": "validated"
+    },
+    {
+      "date": "2026-05-05",
+      "session": "phase00-session02-composition-schema-and-db-models",
       "status": "completed"
     }
   ]
