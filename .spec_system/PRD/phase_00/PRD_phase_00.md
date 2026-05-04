@@ -4,7 +4,7 @@
 **Sessions**: 5 (initial estimate)
 **Estimated Duration**: 10-20 hours
 
-**Progress**: 2/5 sessions (40%)
+**Progress**: 3/5 sessions (60%)
 
 ---
 
@@ -20,7 +20,7 @@ Prove the core JSON-to-video loop locally. Build the FastAPI skeleton, Pydantic 
 |---------|------|--------|------------|-----------|
 | 01 | Project Skeleton and Config | Complete | 20 | 2026-05-05 |
 | 02 | Composition Schema and DB Models | Complete | 20 | 2026-05-05 |
-| 03 | Storage and Asset Service | Not Started | ~15-20 | - |
+| 03 | Storage and Asset Service | Complete | 20 | 2026-05-05 |
 | 04 | Editly Renderer and Segment Compiler | Not Started | ~20-25 | - |
 | 05 | Render Service and API Endpoints | Not Started | ~15-20 | - |
 
@@ -30,12 +30,13 @@ Prove the core JSON-to-video loop locally. Build the FastAPI skeleton, Pydantic 
 
 - **Session 01: Project Skeleton and Config** -- Completed 2026-05-05. Delivered FastAPI skeleton with health endpoint, config system, structured logging, error handling, dev tooling (ruff, mypy, pytest), 20/20 tasks, 13/13 tests.
 - **Session 02: Composition Schema and DB Models** -- Completed 2026-05-05. Delivered Pydantic v2 composition schema with discriminated unions for 5 asset types, Output model with resolution presets and quality mapping, Render SQLModel with status state machine, Alembic migration infrastructure, 20/20 tasks, 82/82 tests.
+- **Session 03: Storage and Asset Service** -- Completed 2026-05-05. Delivered storage protocol and local filesystem adapter, secure asset resolution service with SSRF protection, SHA-256 content-addressed asset cache, ffprobe async wrapper, Pillow text-to-image renderer, 20/20 tasks, 163/163 tests.
 
 ---
 
 ## Upcoming Sessions
 
-- Session 03: Storage and Asset Service
+- Session 04: Editly Renderer and Segment Compiler
 
 ---
 

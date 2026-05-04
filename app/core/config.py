@@ -38,6 +38,31 @@ class Settings(BaseSettings):
     max_asset_size_mb: int = 500
     render_timeout_seconds: int = 600
 
+    asset_download_timeout_seconds: int = 60
+    asset_allow_http: bool = False
+    asset_mime_allowlist: list[str] = [
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "image/svg+xml",
+        "video/mp4",
+        "video/webm",
+        "video/quicktime",
+        "audio/mpeg",
+        "audio/wav",
+        "audio/ogg",
+        "audio/aac",
+        "audio/flac",
+    ]
+    font_search_paths: list[str] = [
+        "/usr/share/fonts/opentype/inter",
+        "/usr/share/fonts/truetype/noto",
+        "/usr/share/fonts/truetype/dejavu",
+        "/usr/share/fonts",
+    ]
+    ffprobe_timeout_seconds: int = 30
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
