@@ -46,6 +46,7 @@ Thumbs.db
 htmlcov/
 .pytest_cache/
 .mypy_cache/
+dogfood-output/
 
 # Spec system archives
 .spec_system/archive/
