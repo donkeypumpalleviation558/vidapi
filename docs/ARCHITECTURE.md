@@ -17,6 +17,7 @@ Client
   | POST /v1/renders (JSON composition)
   v
 FastAPI API (validate, create record, enqueue)
+  |-- Renderer Capability Registry (select + validate renderer support)
   |
   v
 Redis (ARQ job queue)
@@ -28,6 +29,7 @@ Render Worker (ARQ consumer)
   |-- Cancellation Checkpoints (cooperative cancel via DB flag)
   |
   |-- Render Service (stage methods)
+  |   |-- Renderer Capability Registry (fail-closed replay validation)
   |   |-- Merge Service (variable substitution)
   |   |-- Template Service (CRUD, version pinning, template renders)
   |   |-- Asset Service (fetch, validate, cache)
@@ -103,6 +105,12 @@ Local Filesystem (render artifacts)
 - **Tech**: Segment compiler (pure functions), asyncio subprocess, streaming stderr with progress/cancel callbacks
 - **Location**: `app/renderers/editly.py`
 
+### Renderer Capability Registry
+- **Purpose**: Selects the effective renderer and validates renderer-feature compatibility before queue admission, worker compile, or sync-service compile
+- **Tech**: Immutable support declarations, stable capability exceptions, redacted error context
+- **Location**: `app/renderers/capabilities.py`
+- **Current support**: omitted, `auto`, and `editly` select Editly; `ffmpeg-native` and `hyperframes` are known but unavailable future adapters
+
 ### Segment Compiler
 - **Purpose**: Converts absolute-time timeline clips into sequential Editly clips with layers
 - **Tech**: Pure functions -- collect boundaries, generate segments, map layers
@@ -135,12 +143,12 @@ Local Filesystem (render artifacts)
 
 ### Storage Adapter
 - **Purpose**: Persists render artifacts to a deterministic directory structure
-- **Tech**: Protocol-based (local filesystem for dev, S3-compatible planned for production)
+- **Tech**: Protocol-based (local filesystem for dev, S3-compatible for production)
 - **Location**: `app/storage/`
 
 ### Database
 - **Purpose**: Render job metadata persistence
-- **Tech**: SQLModel + aiosqlite (dev), Alembic migrations
+- **Tech**: SQLModel + aiosqlite/asyncpg, Alembic migrations
 - **Location**: `app/db/`
 
 ## Tech Stack Rationale
@@ -150,7 +158,7 @@ Local Filesystem (render artifacts)
 | FastAPI | Web framework | Async-native, Pydantic integration, auto OpenAPI docs |
 | Pydantic v2 | Schema validation | Discriminated unions for asset types, fast validation |
 | ARQ + Redis | Job queue | Async-native, lightweight, fits FastAPI model |
-| SQLModel + aiosqlite | Database | Async SQLite for dev, same API for future PostgreSQL |
+| SQLModel + aiosqlite/asyncpg | Database | Async SQLite for dev, PostgreSQL for production |
 | Alembic | Migrations | Standard Python migration tool, async-compatible |
 | structlog | Logging | Structured JSON logs with context binding |
 | httpx | HTTP client | Async, manual redirect control for SSRF validation |
@@ -161,7 +169,7 @@ Local Filesystem (render artifacts)
 
 ## Data Layer
 
-- **Database**: SQLite (development), PostgreSQL planned for production
+- **Database**: SQLite (development), PostgreSQL (production)
 - **Migration Tool**: Alembic, migrations in `alembic/versions/`, sequential numbering
 - **Storage**: Local filesystem under `data/renders/<render_id>/`
 
@@ -171,23 +179,25 @@ Local Filesystem (render artifacts)
 
 1. Client POSTs JSON composition to `/v1/renders`
 2. Pydantic validates the composition schema
-3. Render record created in SQLite with status `queued`
-4. Input JSON persisted to workspace; job enqueued to Redis via ARQ
-5. API returns 202 Accepted with render ID immediately
-6. Worker picks up job, creates isolated workspace
-7. Worker drives pipeline: fetching -> compiling -> rendering -> uploading
-8. Assets resolved: remote fetched via httpx, text rendered to PNG, all cached by SHA-256
-9. Template-backed renders expand merge variables before compile and persist `expanded.json`
-10. Segment compiler converts absolute-time timeline to sequential Editly clips
-11. Position resolver and transition compiler normalize renderer-facing layout details
-12. Compiled Editly JSON + replay metadata written to workspace
-13. Editly invoked as Node subprocess with timeout; progress parsed from FFmpeg stderr
-14. Detached audio clips mixed via FFmpeg post-processing when needed
-15. Poster extracted from output via FFmpeg
-16. Artifacts persisted to storage
-17. Render status updated to `succeeded` or `failed`
-18. Webhook delivery is queued for terminal states when configured
-19. Client polls GET `/v1/renders/{id}` for status, progress, and download URL
+3. Renderer capability validation selects `editly` for omitted, `auto`, or explicit `editly` requests
+4. Render record created in SQLite with status `queued` and selected renderer metadata
+5. Input JSON persisted to workspace; job enqueued to Redis via ARQ
+6. API returns 202 Accepted with render ID immediately
+7. Worker picks up job and revalidates stored renderer capabilities before workspace creation
+8. Worker creates isolated workspace and drives pipeline: fetching -> compiling -> rendering -> uploading
+9. Assets resolved: remote fetched via httpx, text rendered to PNG, all cached by SHA-256
+10. Template-backed renders expand merge variables before compile and persist `expanded.json`
+11. Render service revalidates renderer capabilities before compilation as a replay defense
+12. Segment compiler converts absolute-time timeline to sequential Editly clips
+13. Position resolver and transition compiler normalize renderer-facing layout details
+14. Compiled Editly JSON + replay metadata written to workspace
+15. Editly invoked as Node subprocess with timeout; progress parsed from FFmpeg stderr
+16. Detached audio clips mixed via FFmpeg post-processing when needed
+17. Poster extracted from output via FFmpeg
+18. Artifacts persisted to storage
+19. Render status updated to `succeeded` or `failed`
+20. Webhook delivery is queued for terminal states when configured
+21. Client polls GET `/v1/renders/{id}` for status, progress, and download URL
 
 ### Cancellation Flow
 
@@ -224,7 +234,7 @@ Same pipeline stages run synchronously within the API request when `RENDER_MODE=
 |----------|--------|-----------|
 | Editly over raw FFmpeg | Editly subprocess | Reduces custom filter graph code for MVP |
 | Segment compiler as pure functions | No class state | Easier to test, clearer data flow |
-| Base-36 render IDs | No ULID dependency | Minimal dependencies for MVP; proper ULID in Phase 03 |
+| Base-36 render IDs | No ULID dependency | Minimal dependencies while keeping sortable public IDs |
 | Non-fatal poster generation | Warning on failure | Missing poster should not fail a successful render |
 | Manual redirect following | Per-hop SSRF check | Prevents redirect-to-private-IP attacks |
 | Track 0 on bottom | Natural z-order | Matches Editly layer ordering |

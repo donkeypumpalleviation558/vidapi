@@ -14,17 +14,22 @@ from app.api.deps import (
     StorageDep,
     StorageUrlResolverDep,
 )
-from app.api.errors import LimitExceededAPIError, QueueSaturatedAPIError, StorageError
+from app.api.errors import (
+    LimitExceededAPIError,
+    QueueSaturatedAPIError,
+    RendererCapabilityAPIError,
+    StorageError,
+)
 from app.core.config import Settings
 from app.db import render_crud
 from app.models.composition import Composition
 from app.models.errors import (
     AUTH_ERROR_RESPONSES,
     CONFLICT_ERROR,
-    LIMIT_ERROR,
     NOT_FOUND_ERROR,
     QUEUE_SATURATED_ERROR,
     QUEUE_UNAVAILABLE_ERROR,
+    RENDERER_CAPABILITY_ERROR,
     REQUEST_SIZE_ERROR,
     VALIDATION_ERROR,
 )
@@ -37,6 +42,10 @@ from app.models.render import (
 )
 from app.models.render import (
     RenderError as RenderErrorModel,
+)
+from app.renderers.capabilities import (
+    RendererCapabilityError,
+    validate_renderer_capabilities,
 )
 from app.services.limits import LimitExceededError, validate_composition_limits
 from app.services.queue_admission import (
@@ -59,7 +68,7 @@ router = APIRouter(tags=["renders"])
     responses={
         **AUTH_ERROR_RESPONSES,
         413: REQUEST_SIZE_ERROR,
-        422: LIMIT_ERROR,
+        422: RENDERER_CAPABILITY_ERROR,
         429: QUEUE_SATURATED_ERROR,
         503: QUEUE_UNAVAILABLE_ERROR,
     },
@@ -79,6 +88,11 @@ async def create_render(
     When RENDER_MODE=sync, executes the full pipeline inline (dev/test).
     """
     try:
+        renderer_selection = validate_renderer_capabilities(composition)
+    except RendererCapabilityError as exc:
+        raise RendererCapabilityAPIError.from_capability_error(exc) from exc
+
+    try:
         validate_composition_limits(composition, settings)
     except LimitExceededError as exc:
         raise LimitExceededAPIError.from_violation(exc.violation) from exc
@@ -90,7 +104,13 @@ async def create_render(
                 detail="Render queue pool not initialized.",
             )
         await _admit_queue_or_raise(settings=settings, arq_pool=arq_pool)
-        return await _create_render_async(composition, session, arq_pool, storage)
+        return await _create_render_async(
+            composition,
+            session,
+            arq_pool,
+            storage,
+            selected_renderer=renderer_selection.renderer,
+        )
     return await _create_render_sync(composition, render_service, session)
 
 
@@ -119,10 +139,16 @@ async def _create_render_async(
     session: DBSessionDep,
     arq_pool: ArqRedis,
     storage: StorageDep,
+    *,
+    selected_renderer: str,
 ) -> CreateRenderResponse:
     """Async path: create record, persist input, enqueue job."""
     callback_url = str(composition.callback) if composition.callback else None
-    render = await render_crud.create_render(session, callback_url=callback_url)
+    render = await render_crud.create_render(
+        session,
+        callback_url=callback_url,
+        renderer=selected_renderer,
+    )
     render_id = render.id
 
     try:
@@ -171,7 +197,11 @@ async def _create_render_async(
             detail="Render queue is unavailable. Please retry later.",
         ) from exc
 
-    await logger.ainfo("render_enqueued", render_id=render_id)
+    await logger.ainfo(
+        "render_enqueued",
+        render_id=render_id,
+        renderer=selected_renderer,
+    )
     return CreateRenderResponse(
         id=render.id,
         status=RenderStatus.QUEUED,

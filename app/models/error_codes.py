@@ -23,6 +23,8 @@ class ErrorCode(StrEnum):
     REQUEST_BODY_TOO_LARGE = "REQUEST_BODY_TOO_LARGE"
     LIMIT_EXCEEDED = "LIMIT_EXCEEDED"
     MEDIA_LIMIT_EXCEEDED = "MEDIA_LIMIT_EXCEEDED"
+    UNSUPPORTED_RENDERER = "UNSUPPORTED_RENDERER"
+    UNSUPPORTED_RENDERER_FEATURE = "UNSUPPORTED_RENDERER_FEATURE"
     RENDER_CANCELLED = "RENDER_CANCELLED"
     WORKER_UNEXPECTED_ERROR = "WORKER_UNEXPECTED_ERROR"
     INVALID_COMPOSITION = "INVALID_COMPOSITION"
@@ -58,6 +60,10 @@ def _register_defaults() -> None:
     """
     from app.api.errors import AssetFetchError, MediaLimitError
     from app.renderers.base import CompileError, RenderError
+    from app.renderers.capabilities import (
+        UnsupportedRendererError,
+        UnsupportedRendererFeatureError,
+    )
     from app.services.limits import LimitExceededError
     from app.services.merge import MergeError
     from app.services.render_service import RenderServiceError
@@ -70,6 +76,11 @@ def _register_defaults() -> None:
     register_exception(RenderError, ErrorCode.RENDER_ERROR)
     register_exception(AssetFetchError, ErrorCode.ASSET_FETCH_ERROR)
     register_exception(MediaLimitError, ErrorCode.MEDIA_LIMIT_EXCEEDED)
+    register_exception(UnsupportedRendererError, ErrorCode.UNSUPPORTED_RENDERER)
+    register_exception(
+        UnsupportedRendererFeatureError,
+        ErrorCode.UNSUPPORTED_RENDERER_FEATURE,
+    )
     register_exception(LimitExceededError, ErrorCode.LIMIT_EXCEEDED)
     register_exception(MergeError, ErrorCode.MERGE_ERROR)
     register_exception(TimeoutError, ErrorCode.RENDER_TIMEOUT)

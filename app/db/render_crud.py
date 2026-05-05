@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any, cast
 
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
@@ -48,12 +49,14 @@ async def create_render(
     template_id: str | None = None,
     template_version_id: str | None = None,
     callback_url: str | None = None,
+    renderer: str | None = None,
 ) -> Render:
     """Create a new render record in QUEUED status."""
     render = Render(
         template_id=template_id,
         template_version_id=template_version_id,
         callback_url=callback_url,
+        renderer=renderer,
     )
     session.add(render)
     await _commit_and_refresh(session, render)
@@ -194,8 +197,12 @@ async def count_renderer_failures(
         select(Render.renderer, Render.error_code, func.count())
         .select_from(Render)
         .where(Render.status == RenderStatus.FAILED.value)
-        .group_by(Render.renderer, Render.error_code)
-        .order_by(func.count().desc(), Render.renderer, Render.error_code)
+        .group_by(cast(Any, Render.renderer), cast(Any, Render.error_code))
+        .order_by(
+            func.count().desc(),
+            cast(Any, Render.renderer),
+            cast(Any, Render.error_code),
+        )
         .limit(limit)
     )
     return [
@@ -350,6 +357,24 @@ async def update_render_paths(
     if renderer is not None:
         render.renderer = renderer
 
+    render.updated_at = datetime.now(tz=UTC)
+
+    session.add(render)
+    await _commit_and_refresh(session, render)
+    return render
+
+
+async def update_render_renderer(
+    session: AsyncSession,
+    render_id: str,
+    renderer: str,
+) -> Render | None:
+    """Persist the selected renderer on a render record."""
+    render = await get_render_by_id(session, render_id)
+    if render is None:
+        return None
+
+    render.renderer = renderer
     render.updated_at = datetime.now(tz=UTC)
 
     session.add(render)

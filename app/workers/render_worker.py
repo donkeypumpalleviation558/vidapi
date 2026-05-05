@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import time
+from datetime import datetime
 from typing import Any
 
 import structlog
@@ -11,9 +12,14 @@ from arq.connections import ArqRedis
 from app.api.errors import StorageError
 from app.core.config import get_settings
 from app.db import render_crud
+from app.db.models import Render
 from app.db.session import _get_engine
 from app.models.error_codes import ErrorCode, error_code_for_exception
 from app.models.render import RenderStatus
+from app.renderers.capabilities import (
+    RendererCapabilityError,
+    validate_renderer_capabilities,
+)
 from app.services.ffmpeg_progress import compute_progress_percent, parse_time_from_line
 from app.services.render_service import RenderService, RenderServiceError
 from app.services.webhook_service import dispatch_webhook
@@ -135,6 +141,38 @@ async def run_render(ctx: dict[str, Any], render_id: str) -> None:
             )
             return
 
+        try:
+            renderer_selection = validate_renderer_capabilities(composition)
+        except RendererCapabilityError as exc:
+            await _mark_failed(
+                session_factory,
+                render_id,
+                ErrorCode(exc.code),
+                str(exc),
+                log_collector,
+                workspace,
+                renderer=exc.renderer,
+            )
+            await logger.aerror(
+                "worker_renderer_capability_validation_failed",
+                render_id=render_id,
+                renderer=exc.renderer,
+                error_code=exc.code,
+                context=exc.to_context(),
+            )
+            return
+
+        await render_crud.update_render_renderer(
+            session,
+            render_id,
+            renderer_selection.renderer,
+        )
+        await logger.ainfo(
+            "worker_renderer_selected",
+            render_id=render_id,
+            renderer=renderer_selection.renderer,
+        )
+
     # Pipeline execution with workspace lifecycle
     try:
         workspace = await workspace_mgr.create(render_id)
@@ -174,11 +212,12 @@ async def run_render(ctx: dict[str, Any], render_id: str) -> None:
     except Exception as exc:
         error_code = _resolve_error_code(exc)
         error_message = str(exc)[:500]
+        renderer_name = _renderer_name_for_exception(exc)
 
         log_collector.add_error(
             "pipeline",
             f"Pipeline failed: {error_message}",
-            extra={"error_code": error_code.value},
+            extra={"error_code": error_code.value, "renderer": renderer_name},
         )
 
         # Flush logs before marking failed
@@ -207,6 +246,7 @@ async def run_render(ctx: dict[str, Any], render_id: str) -> None:
             error_message,
             log_collector,
             workspace,
+            renderer=renderer_name,
         )
 
         if workspace is not None:
@@ -512,6 +552,15 @@ def _resolve_error_code(exc: Exception) -> ErrorCode:
     return error_code_for_exception(exc)
 
 
+def _renderer_name_for_exception(exc: Exception) -> str | None:
+    if isinstance(exc, RenderServiceError) and isinstance(
+        exc.cause,
+        RendererCapabilityError,
+    ):
+        return exc.cause.renderer
+    return None
+
+
 async def _mark_failed(
     session_factory: Any,
     render_id: str,
@@ -519,6 +568,8 @@ async def _mark_failed(
     error_message: str,
     log_collector: RenderLogCollector,
     workspace: Any,
+    *,
+    renderer: str | None = None,
 ) -> None:
     """Transition render to FAILED status with error details."""
     log_collector.add_error("failed", f"{error_code.value}: {error_message}")
@@ -527,6 +578,12 @@ async def _mark_failed(
         render = await render_crud.get_render_by_id(session, render_id)
         updated_render = render
         if render is not None and not RenderStatus(render.status).is_terminal:
+            if renderer is not None:
+                await render_crud.update_render_renderer(
+                    session,
+                    render_id,
+                    renderer,
+                )
             updated_render = await render_crud.update_render_status(
                 session,
                 render_id,
@@ -541,6 +598,7 @@ async def _mark_failed(
     await logger.aerror(
         "worker_task_failed",
         render_id=render_id,
+        renderer=renderer,
         status=RenderStatus.FAILED.value,
         stage="failed",
         error_code=error_code.value,
@@ -553,11 +611,11 @@ async def enqueue_render(pool: ArqRedis, render_id: str) -> None:
     await pool.enqueue_job("run_render", render_id)
 
 
-def _seconds_between(start: Any, end: Any) -> float:
+def _seconds_between(start: datetime, end: datetime) -> float:
     return round(max(0.0, (end - start).total_seconds()), 3)
 
 
-def _render_duration_seconds(render: Any) -> float | None:
+def _render_duration_seconds(render: Render | None) -> float | None:
     if render is None:
         return None
     if render.started_at is None or render.completed_at is None:

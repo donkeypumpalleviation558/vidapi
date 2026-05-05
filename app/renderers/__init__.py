@@ -5,38 +5,66 @@ from app.renderers.base import (
     CompileError,
     RenderArtifact,
     RendererProtocol,
+    RendererResolver,
     RenderError,
+)
+from app.renderers.capabilities import (
+    DEFAULT_RENDERER,
+    RENDERER_CAPABILITIES,
+    RendererCapability,
+    RendererCapabilityError,
+    RendererSelection,
+    UnsupportedRendererError,
+    UnsupportedRendererFeatureError,
+    available_renderer_names,
+    get_capability,
+    known_renderer_names,
+    select_renderer,
+    validate_renderer_capabilities,
 )
 from app.renderers.editly import EditlyRenderer
 from app.renderers.poster import PosterError, generate_poster
 
 _RENDERER_REGISTRY: dict[str, type[RendererProtocol]] = {
-    "editly": EditlyRenderer,
+    DEFAULT_RENDERER: EditlyRenderer,
 }
 
 
 def get_renderer(name: str | None = None) -> RendererProtocol:
-    """Resolve a renderer by name. Defaults to editly for MVP."""
-    if name is None or name == "auto":
-        name = "editly"
+    """Resolve an available renderer implementation by requested name."""
+    selection = select_renderer(name)
 
-    renderer_cls = _RENDERER_REGISTRY.get(name)
+    renderer_cls = _RENDERER_REGISTRY.get(selection.renderer)
     if renderer_cls is None:
-        raise ValueError(
-            f"Unknown renderer: {name!r}. Available: {list(_RENDERER_REGISTRY)}"
+        raise UnsupportedRendererError(
+            selection.renderer,
+            reason="unavailable",
         )
 
     return renderer_cls()
 
 
 __all__ = [
+    "DEFAULT_RENDERER",
+    "RENDERER_CAPABILITIES",
     "CompileError",
     "CompiledRender",
     "EditlyRenderer",
     "PosterError",
     "RenderArtifact",
     "RenderError",
+    "RendererCapability",
+    "RendererCapabilityError",
     "RendererProtocol",
+    "RendererResolver",
+    "RendererSelection",
+    "UnsupportedRendererError",
+    "UnsupportedRendererFeatureError",
+    "available_renderer_names",
     "generate_poster",
+    "get_capability",
     "get_renderer",
+    "known_renderer_names",
+    "select_renderer",
+    "validate_renderer_capabilities",
 ]

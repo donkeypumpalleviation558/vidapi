@@ -1,7 +1,7 @@
 # Security & Compliance
 
 > Cumulative security posture and GDPR compliance record. Updated between phases via carryforward.
-> **Line budget**: 1000 max | **Last updated**: Phase 02 (2026-05-05)
+> **Line budget**: 1000 max | **Last updated**: Phase 03 (2026-05-05)
 
 ---
 
@@ -14,8 +14,8 @@
 | Open Findings | 0 |
 | Critical/High | 0 |
 | Medium/Low | 0 |
-| Phases Audited | 3 |
-| Last Clean Phase | P02 |
+| Phases Audited | 4 |
+| Last Clean Phase | P03 |
 
 ---
 
@@ -52,7 +52,7 @@ No personal data collected or processed.
 | Data minimization verified | N/A | No personal data in scope |
 | Deletion/erasure path exists | N/A | No personal data stored |
 | No PII in application logs | PASS | Logs contain only render_id, file paths, hashes, error codes, stage names, and timing metadata |
-| Third-party transfers documented | N/A | No external services contacted beyond user-provided asset URLs; Redis is self-hosted |
+| Third-party transfers documented | N/A | No external services contacted beyond user-provided asset URLs and deployment-controlled storage targets |
 
 ---
 
@@ -62,16 +62,16 @@ No personal data collected or processed.
 
 None known.
 
-**Dependencies audited (Phase 02):**
+**Dependencies audited (Phase 03):**
 - fastapi 0.136.1, starlette 0.52.1, pydantic, pydantic-settings -- web framework stack
 - arq 0.28.0, redis[hiredis] 5.3.1 -- queue and cache stack
-- sqlmodel, aiosqlite, alembic -- database stack
+- sqlmodel, aiosqlite, alembic, asyncpg -- database stack
 - httpx -- async HTTP client for webhook delivery
 - Jinja2 3.1.x -- template expansion engine
 - Pillow -- text-to-image rendering
 - structlog -- structured logging
 - System-level: FFmpeg 6.1.1, Node.js v24.14.0, Editly (Node subprocess)
-- Docker base images: python:3.11-slim, node:20-slim, redis:7-alpine
+- Docker base images: python:3.11-slim, node:20-slim, redis:7-alpine, postgres:16-alpine, MinIO
 
 ---
 
@@ -79,6 +79,10 @@ None known.
 
 | Phase | Finding | Resolution |
 |-------|---------|------------|
+| P03 | Unprotected non-health API routes | Added API-key authentication for render, template, and ops routes while keeping health endpoints public.
+| P03 | Unbounded request and queue exposure | Added request size, composition, asset, and queue guardrails with fail-closed validation.
+| P03 | Production schema drift risk | Startup now requires migration readiness instead of creating unmanaged schema on boot.
+| P03 | Orphaned workspace accumulation | Worker startup now prunes inactive workspaces and keeps cleanup bounded.
 | P02 | Starlette CVE-2025-54121 / CVE-2025-62727 backlog | Upgraded FastAPI and raised the Starlette floor to `>=0.49.1`; local resolution reached `starlette==0.52.1`.
 | P02 | Wildcard production CORS | Production startup now rejects wildcard origins unless `DEBUG=true`.
 | P02 | Unbounded render submissions | `POST /v1/renders` now uses bounded rate limiting with structured `429` responses.
@@ -94,6 +98,7 @@ None known.
 | P00 | 5 | PASS | N/A | 0 | 0 |
 | P01 | 5 | PASS | N/A | 0 | 0 |
 | P02 | 5 | PASS | N/A | 0 | 3 |
+| P03 | 5 | PASS | N/A | 0 | 4 |
 
 ---
 
@@ -101,10 +106,9 @@ None known.
 
 Actionable items for upcoming phases based on cumulative findings.
 
-1. **Add Redis AUTH for production** (Phase 03): Docker Redis currently runs without a password. Production deployments must require authentication via `requirepass` or ACL.
-2. **Enable Redis TLS for production** (Phase 03): `REDIS_URL` supports `rediss://` for encrypted connections. Enforce it in production environments.
-3. **Add Docker secrets support** (Phase 03): Production credentials should use Docker secrets or Vault rather than environment variables in `.env` files.
-4. **Scope render access to authenticated users** (Phase 03): Any client with a `render_id` can currently access status and output.
+1. Keep Redis TLS enabled for managed or cross-host deployments even though AUTH is wired through the compose path.
+2. Prefer Docker secrets or another secret manager for API keys, Postgres, MinIO, and webhook secrets in real production.
+3. Revisit authorization if VidAPI grows beyond single-operator self-hosting; current auth is route-level API-key based, not tenant-aware.
 
 ---
 

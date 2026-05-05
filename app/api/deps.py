@@ -10,6 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings, get_settings
 from app.core.redis import get_arq_pool
 from app.db.session import get_session
+from app.renderers import (
+    DEFAULT_RENDERER,
+    RendererProtocol,
+    RendererResolver,
+    select_renderer,
+)
 from app.renderers.editly import EditlyRenderer
 from app.services.asset_service import AssetService
 from app.services.render_service import RenderService
@@ -71,11 +77,24 @@ def get_editly_renderer() -> EditlyRenderer:
 
 
 @lru_cache(maxsize=1)
+def get_renderer_resolver() -> RendererResolver:
+    def _resolve(renderer_name: str | None = None) -> RendererProtocol:
+        selection = select_renderer(renderer_name)
+        if selection.renderer == DEFAULT_RENDERER:
+            return get_editly_renderer()
+        msg = f"No renderer implementation configured for {selection.renderer}"
+        raise ValueError(msg)
+
+    return _resolve
+
+
+@lru_cache(maxsize=1)
 def get_render_service() -> RenderService:
     return RenderService(
         storage=get_storage_backend(),
         asset_service=get_asset_service(),
         renderer=get_editly_renderer(),
+        renderer_resolver=get_renderer_resolver(),
     )
 
 
@@ -92,4 +111,5 @@ StorageUrlResolverDep = Annotated[
 ]
 AssetServiceDep = Annotated[AssetService, Depends(get_asset_service)]
 EditlyRendererDep = Annotated[EditlyRenderer, Depends(get_editly_renderer)]
+RendererResolverDep = Annotated[RendererResolver, Depends(get_renderer_resolver)]
 RenderServiceDep = Annotated[RenderService, Depends(get_render_service)]

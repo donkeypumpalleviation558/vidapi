@@ -1041,7 +1041,7 @@ This system delivers the product via phases. Each phase is implemented via multi
 | 01 | Async Jobs and Multi-track | 5 | Complete (5/5) |
 | 02 | Templates and Polish | 5 | Complete (5/5) |
 | 03 | Production Hardening | 5 | Complete (5/5) |
-| 04 | Advanced Rendering | TBD | Not Started |
+| 04 | Advanced Rendering | 6 | Not Started |
 
 ## Phase 00: Foundation
 
@@ -1206,6 +1206,19 @@ Expand creative ceiling and performance options without changing the public API.
 - Renderer selection works through the same protocol.
 - Existing Editly-backed renders keep passing.
 - New renderer paths have focused compatibility tests.
+
+### Sessions
+
+| Session | Name | Est. Tasks |
+|---------|------|------------|
+| 01 | Renderer Capability Registry | ~18 |
+| 02 | Output Formats and Presets | ~20 |
+| 03 | Captions and Poster Customization | ~18 |
+| 04 | Advanced Transitions and Feature Validation | ~18 |
+| 05 | Native FFmpeg Renderer Subset | ~22 |
+| 06 | HyperFrames Renderer Adapter | ~22 |
+
+Session stubs: `.spec_system/PRD/phase_04/`
 
 ## First Build Target
 

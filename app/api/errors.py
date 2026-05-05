@@ -77,6 +77,20 @@ class LimitExceededAPIError(VidAPIError):
         )
 
 
+class RendererCapabilityAPIError(VidAPIError):
+    error_code = "RENDERER_CAPABILITY_ERROR"
+    status_code = 422
+    detail = "Renderer capability validation failed."
+
+    @classmethod
+    def from_capability_error(cls, exc: Any) -> RendererCapabilityAPIError:
+        return cls(
+            detail=str(exc),
+            error_code=str(exc.code),
+            context=dict(exc.to_context()),
+        )
+
+
 class MediaLimitError(AssetFetchError):
     error_code = "MEDIA_LIMIT_EXCEEDED"
     status_code = 422

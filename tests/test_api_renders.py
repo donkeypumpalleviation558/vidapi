@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from copy import deepcopy
 from unittest.mock import AsyncMock
 
 import pytest
@@ -143,6 +144,39 @@ class TestPostRenders:
         }
         response = await client.post("/v1/renders", json=payload)
         assert response.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_unknown_renderer_returns_stable_error(
+        self,
+        client: AsyncClient,
+        sample_composition: dict,
+    ):
+        payload = deepcopy(sample_composition)
+        payload["renderer"] = "unknown-renderer"
+
+        response = await client.post("/v1/renders", json=payload)
+
+        assert response.status_code == 422
+        body = response.json()
+        assert body["error"]["code"] == "UNSUPPORTED_RENDERER"
+        assert body["error"]["context"]["renderer"] == "unknown-renderer"
+
+    @pytest.mark.asyncio
+    async def test_unsupported_output_format_returns_stable_error(
+        self,
+        client: AsyncClient,
+        sample_composition: dict,
+    ):
+        payload = deepcopy(sample_composition)
+        payload["output"]["format"] = "png-sequence"
+
+        response = await client.post("/v1/renders", json=payload)
+
+        assert response.status_code == 422
+        body = response.json()
+        assert body["error"]["code"] == "UNSUPPORTED_RENDERER_FEATURE"
+        assert body["error"]["context"]["feature"] == "output.format"
+        assert body["error"]["context"]["requested"] == "png-sequence"
 
 
 # ---------------------------------------------------------------------------

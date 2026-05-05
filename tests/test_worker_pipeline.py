@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from contextlib import asynccontextmanager
+from copy import deepcopy
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -483,6 +484,42 @@ class TestPipelineFailures:
             assert render is not None
             assert render.status == RenderStatus.FAILED.value
             assert render.error_code == ErrorCode.INPUT_FILE_MISSING.value
+
+    @pytest.mark.asyncio
+    async def test_capability_validation_failure_marks_failed_before_pipeline_stages(
+        self,
+        pipeline_db_engine,
+        pipeline_session_factory,
+        pipeline_workspace,
+        mock_service,
+        sample_composition_dict,
+    ):
+        """Worker rejects unsupported renderer features before stage execution."""
+        payload = deepcopy(sample_composition_dict)
+        payload["output"]["format"] = "webm"
+        render_id = await _create_render_with_input(
+            pipeline_session_factory,
+            pipeline_workspace,
+            payload,
+        )
+
+        ctx = {
+            "session_factory": pipeline_session_factory,
+            "render_service": mock_service,
+            "workspace_manager": pipeline_workspace,
+        }
+
+        await run_render(ctx, render_id)
+
+        async with pipeline_session_factory() as session:
+            render = await render_crud.get_render_by_id(session, render_id)
+            assert render is not None
+            assert render.status == RenderStatus.FAILED.value
+            assert render.error_code == ErrorCode.UNSUPPORTED_RENDERER_FEATURE.value
+            assert render.renderer == "editly"
+
+        mock_service.stage_validate_and_expand.assert_not_called()
+        mock_service.stage_resolve_and_compile.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

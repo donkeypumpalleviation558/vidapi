@@ -94,7 +94,7 @@ curl -H "X-API-Key: $VIDAPI_API_KEY" http://localhost:8000/v1/renders
 |   |-- core/              # Config (pydantic-settings), logging, security
 |   |-- db/                # SQLModel tables, CRUD, async sessions
 |   |-- models/            # Pydantic composition, template, and render schemas
-|   |-- renderers/         # Renderer protocol, Editly bridge, poster gen
+|   |-- renderers/         # Renderer protocol, capability registry, Editly bridge, poster gen
 |   |-- services/          # Render pipeline, asset, template, and webhook services
 |   |-- storage/           # Storage protocol and local filesystem adapter
 |   \-- workers/           # Background job workers (Phase 01)
@@ -148,6 +148,20 @@ API key auth is enabled.
 
 Interactive API docs at `http://localhost:8000/docs` (Swagger) or `/redoc`.
 
+### Renderer Selection
+
+Render requests may omit `renderer`, set it to `auto`, or explicitly request
+`editly`; all three currently select the Editly renderer. Future renderer names
+such as `ffmpeg-native` and `hyperframes` are reserved but unavailable until
+their adapters are implemented.
+
+VidAPI validates renderer capabilities before direct render jobs are persisted,
+queued, or compiled. Unsupported renderers return `UNSUPPORTED_RENDERER`.
+Unsupported renderer-feature combinations, such as requesting `webm` output
+from Editly, return `UNSUPPORTED_RENDERER_FEATURE` with bounded context. See
+[Renderer Capabilities](docs/renderer-capabilities.md) for the support matrix
+and extension contract.
+
 ### API Authentication
 
 `GET /health` and `GET /v1/health` are always public. When
@@ -186,6 +200,7 @@ and a `Retry-After` header.
 - [Getting Started](docs/onboarding.md)
 - [Development Guide](docs/development.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [Renderer Capabilities](docs/renderer-capabilities.md)
 - [Deployment](docs/deployment.md)
 - [Environments](docs/environments.md)
 - [Operations](docs/operations.md)
@@ -208,7 +223,7 @@ and a `Retry-After` header.
 
 ## Project Status
 
-Phases 00, 01, and 02 are complete; Phase 03 is in progress. See
+Phases 00, 01, 02, and 03 are complete; Phase 04 is not started. See
 [PRD](.spec_system/PRD/PRD.md) for current progress and roadmap.
 
 | Phase | Name | Status |
@@ -216,7 +231,7 @@ Phases 00, 01, and 02 are complete; Phase 03 is in progress. See
 | 00 | Foundation | Complete (5/5 sessions) |
 | 01 | Async Jobs and Multi-track | Complete (5/5 sessions) |
 | 02 | Templates and Polish | Complete (5/5 sessions) |
-| 03 | Production Hardening | In Progress (4/5 sessions) |
+| 03 | Production Hardening | Complete (5/5 sessions) |
 | 04 | Advanced Rendering | Not Started |
 
 ## License

@@ -431,6 +431,7 @@ async def render_template(
 
     if settings.render_mode == "async":
         try:
+            assert arq_pool is not None
             await enqueue_render(arq_pool, render_id)
         except (RedisConnectionError, OSError) as exc:
             await render_crud.update_render_status(

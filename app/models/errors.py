@@ -70,6 +70,10 @@ LIMIT_ERROR = documented_error(
     "Request exceeds configured render resource limits.",
     ErrorResponse,
 )
+RENDERER_CAPABILITY_ERROR = documented_error(
+    "Requested renderer or renderer feature is unsupported.",
+    ErrorResponse,
+)
 QUEUE_SATURATED_ERROR = documented_error(
     "Render queue is at configured capacity.",
     ErrorResponse,

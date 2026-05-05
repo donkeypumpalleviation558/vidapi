@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import and_, case, func, or_
 from sqlalchemy.exc import SQLAlchemyError
@@ -96,7 +97,7 @@ async def list_attempts_by_render_id(
     return list(result.scalars().all())
 
 
-def _webhook_failure_filter():
+def _webhook_failure_filter() -> Any:
     return or_(
         col(WebhookAttempt.error).is_not(None),
         and_(

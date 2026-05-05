@@ -93,10 +93,10 @@ def format_prometheus_metrics(snapshot: MetricsSnapshot) -> str:
         "# HELP vidapi_render_status_total Current renders grouped by status.",
         "# TYPE vidapi_render_status_total gauge",
     ]
-    for count in snapshot.render_status_counts:
+    for status_count in snapshot.render_status_counts:
         lines.append(
-            f'vidapi_render_status_total{{status="{_label(count.status)}"}} '
-            f"{count.count}"
+            f'vidapi_render_status_total{{status="{_label(status_count.status)}"}} '
+            f"{status_count.count}"
         )
 
     lines.extend(
@@ -106,11 +106,12 @@ def format_prometheus_metrics(snapshot: MetricsSnapshot) -> str:
             "# TYPE vidapi_renderer_failures_total gauge",
         ]
     )
-    for count in snapshot.renderer_failure_counts:
+    for failure_count in snapshot.renderer_failure_counts:
         lines.append(
             "vidapi_renderer_failures_total"
-            f'{{renderer="{_label(count.renderer)}",'
-            f'error_code="{_label(count.error_code)}"}} {count.count}'
+            f'{{renderer="{_renderer_label(failure_count.renderer)}",'
+            f'error_code="{_label(failure_count.error_code)}"}} '
+            f"{failure_count.count}"
         )
 
     lines.extend(
@@ -120,11 +121,12 @@ def format_prometheus_metrics(snapshot: MetricsSnapshot) -> str:
             "# TYPE vidapi_webhook_attempts_total gauge",
         ]
     )
-    for count in snapshot.webhook_outcome_counts:
+    for webhook_count in snapshot.webhook_outcome_counts:
         lines.append(
             "vidapi_webhook_attempts_total"
-            f'{{webhook_event="{_label(count.webhook_event)}",'
-            f'outcome="{_label(count.outcome)}"}} {count.count}'
+            f'{{webhook_event="{_label(webhook_count.webhook_event)}",'
+            f'outcome="{_label(webhook_count.outcome)}"}} '
+            f"{webhook_count.count}"
         )
 
     lines.extend(
@@ -179,6 +181,11 @@ def _format_timing_summary(name: str, samples: list[RenderTimingSample]) -> list
 
 def _label(value: str) -> str:
     return value[:100].replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
+
+
+def _renderer_label(value: str) -> str:
+    renderer = value.strip() or "unknown"
+    return _label(renderer)
 
 
 def _float(value: float) -> str:

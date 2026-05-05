@@ -18,6 +18,7 @@ from app.api.deps import (
     get_editly_renderer,
     get_local_storage,
     get_render_service,
+    get_renderer_resolver,
     get_storage_backend,
     get_storage_url_resolver,
     get_template_service,
@@ -48,6 +49,7 @@ def reset_app_settings_cache() -> Iterator[None]:
     get_storage_url_resolver.cache_clear()
     get_asset_service.cache_clear()
     get_editly_renderer.cache_clear()
+    get_renderer_resolver.cache_clear()
     get_render_service.cache_clear()
     get_template_service.cache_clear()
     yield
@@ -57,6 +59,7 @@ def reset_app_settings_cache() -> Iterator[None]:
     get_storage_url_resolver.cache_clear()
     get_asset_service.cache_clear()
     get_editly_renderer.cache_clear()
+    get_renderer_resolver.cache_clear()
     get_render_service.cache_clear()
     get_template_service.cache_clear()
 

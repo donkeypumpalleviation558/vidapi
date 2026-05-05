@@ -367,7 +367,7 @@ class Output(BaseModel):
 # Renderer selector
 # ---------------------------------------------------------------------------
 
-RendererChoice = Literal["auto", "editly", "ffmpeg-native", "hyperframes"]
+RendererChoice = str
 
 
 # ---------------------------------------------------------------------------
@@ -380,7 +380,7 @@ class Composition(BaseModel):
     output: Output = Field(default_factory=Output)
     merge: dict[str, str | int | float | bool] | None = None
     callback: HttpUrl | None = None
-    renderer: RendererChoice | None = None
+    renderer: RendererChoice | None = Field(default=None, max_length=64)
 
     @model_validator(mode="after")
     def _validate_timeline_has_content(self) -> Composition:

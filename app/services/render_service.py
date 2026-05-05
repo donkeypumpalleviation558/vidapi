@@ -18,8 +18,18 @@ from app.models.composition import (
     VideoAsset,
 )
 from app.models.render import RenderStatus
-from app.renderers.base import CompiledRender, CompileError, RenderError
-from app.renderers.editly import EditlyRenderer
+from app.renderers import get_renderer
+from app.renderers.base import (
+    CompiledRender,
+    CompileError,
+    RendererProtocol,
+    RendererResolver,
+    RenderError,
+)
+from app.renderers.capabilities import (
+    RendererCapabilityError,
+    validate_renderer_capabilities,
+)
 from app.renderers.poster import PosterError, generate_poster
 from app.services.asset_service import AssetService
 from app.services.merge import MergeError, expand_merge_variables
@@ -55,11 +65,22 @@ class RenderService:
         self,
         storage: ArtifactStorageProtocol,
         asset_service: AssetService,
-        renderer: EditlyRenderer,
+        renderer: RendererProtocol,
+        renderer_resolver: RendererResolver | None = None,
     ) -> None:
         self._storage = storage
         self._asset_service = asset_service
         self._renderer = renderer
+        self._renderer_resolver = renderer_resolver or get_renderer
+
+    def _resolve_renderer(self, renderer_name: str) -> RendererProtocol:
+        if self._renderer.name == renderer_name:
+            return self._renderer
+        renderer = self._renderer_resolver(renderer_name)
+        if renderer.name != renderer_name:
+            msg = "Renderer resolver returned a mismatched renderer"
+            raise RenderServiceError(msg, error_code="UNSUPPORTED_RENDERER")
+        return renderer
 
     # ------------------------------------------------------------------
     # Convenience: full pipeline (sync path)
@@ -217,10 +238,31 @@ class RenderService:
 
         Raises RenderServiceError on compile failures.
         """
+        try:
+            renderer_selection = validate_renderer_capabilities(composition)
+        except RendererCapabilityError as exc:
+            raise RenderServiceError(
+                str(exc),
+                error_code=exc.code,
+                cause=exc,
+            ) from exc
+
+        renderer = self._resolve_renderer(renderer_selection.renderer)
+        await render_crud.update_render_renderer(
+            session,
+            render_id,
+            renderer_selection.renderer,
+        )
+        await logger.ainfo(
+            "renderer_selected",
+            render_id=render_id,
+            renderer=renderer_selection.renderer,
+        )
+
         asset_map = await self._resolve_all_assets(composition, workspace)
 
         try:
-            compiled = await self._renderer.compile(
+            compiled = await renderer.compile(
                 composition,
                 workspace,
                 render_id=render_id,
@@ -247,10 +289,15 @@ class RenderService:
             render_id,
             compiled_path=compiled_uri,
             replay_path=replay_uri,
-            renderer=self._renderer.name,
+            renderer=compiled.renderer_name,
         )
 
-        await logger.ainfo("stage_compile_complete", render_id=render_id, progress=40)
+        await logger.ainfo(
+            "stage_compile_complete",
+            render_id=render_id,
+            progress=40,
+            renderer=compiled.renderer_name,
+        )
         return compiled
 
     async def stage_render_and_store(
@@ -268,8 +315,9 @@ class RenderService:
 
         Raises RenderServiceError on render failures.
         """
+        renderer = self._resolve_renderer(compiled.renderer_name)
         try:
-            artifact = await self._renderer.render(
+            artifact = await renderer.render(
                 compiled,
                 progress_callback=progress_callback,
                 cancel_check=cancel_check,
@@ -338,7 +386,12 @@ class RenderService:
                 log_path=durable_log_uri,
             )
 
-        await logger.ainfo("stage_render_complete", render_id=render_id, progress=95)
+        await logger.ainfo(
+            "stage_render_complete",
+            render_id=render_id,
+            progress=95,
+            renderer=compiled.renderer_name,
+        )
 
     # ------------------------------------------------------------------
     # Asset resolution
@@ -410,12 +463,27 @@ class RenderService:
             if exc.cause is not None:
                 error_message = str(exc.cause)
 
+        renderer_name: str | None = None
+        if isinstance(exc, RenderServiceError) and isinstance(
+            exc.cause,
+            RendererCapabilityError,
+        ):
+            renderer_name = exc.cause.renderer
+
         await logger.aerror(
             "render_pipeline_failed",
             render_id=render_id,
+            renderer=renderer_name,
             error_code=error_code,
             error_message=error_message,
         )
+
+        if renderer_name is not None:
+            await render_crud.update_render_renderer(
+                session,
+                render_id,
+                renderer_name,
+            )
 
         if workspace is not None and workspace.exists():
             log_path = workspace / "logs.txt"

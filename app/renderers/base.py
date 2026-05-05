@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from app.models.composition import Composition
 
@@ -58,6 +58,7 @@ class RendererProtocol(Protocol):
         workspace: Path,
         *,
         render_id: str,
+        asset_path_resolver: dict[str, str] | None = None,
     ) -> CompiledRender:
         """Transform a VidAPI Composition into a renderer-specific spec.
 
@@ -69,10 +70,19 @@ class RendererProtocol(Protocol):
         self,
         compiled: CompiledRender,
         *,
-        timeout_seconds: int = 600,
+        timeout_seconds: int | None = None,
+        progress_callback: Any | None = None,
+        cancel_check: Any | None = None,
     ) -> RenderArtifact:
         """Execute the compiled spec and produce output artifacts.
 
         Invokes the renderer subprocess, captures logs, and verifies output.
         """
         ...
+
+
+@runtime_checkable
+class RendererResolver(Protocol):
+    """Callable that resolves renderer names to renderer implementations."""
+
+    def __call__(self, renderer_name: str | None = None) -> RendererProtocol: ...

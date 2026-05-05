@@ -41,7 +41,12 @@ def test_format_prometheus_metrics_is_deterministic_and_redacted() -> None:
                 renderer='editly"main',
                 error_code="RENDER_ERROR",
                 count=2,
-            )
+            ),
+            RendererFailureCount(
+                renderer="",
+                error_code="UNSUPPORTED_RENDERER_FEATURE",
+                count=1,
+            ),
         ],
         webhook_outcome_counts=[
             WebhookOutcomeCount(
@@ -59,6 +64,10 @@ def test_format_prometheus_metrics_is_deterministic_and_redacted() -> None:
 
     assert 'vidapi_render_status_total{status="failed"} 2' in text
     assert 'vidapi_renderer_failures_total{renderer="editly\\"main"' in text
+    assert (
+        'vidapi_renderer_failures_total{renderer="unknown",'
+        'error_code="UNSUPPORTED_RENDERER_FEATURE"} 1'
+    ) in text
     assert 'webhook_event="render.failed",outcome="failure"} 3' in text
     assert "vidapi_queue_available 1" in text
     assert "vidapi_queue_depth 7" in text

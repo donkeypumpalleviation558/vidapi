@@ -11,8 +11,8 @@ Below is a ranked map of the closest OSS options and how they relate to Creatoma
 
 Both expose REST APIs, use JSON to describe timelines/scenes, support dynamic data via variables, and hide an FFmpeg‑like backend. [rendi](https://www.rendi.dev/blog/best-video-generation-apis)
 
-When looking for OSS “clones”, the closest matches are:  
-1) services that accept JSON/markup and output video via FFmpeg, and  
+When looking for OSS “clones”, the closest matches are:
+1) services that accept JSON/markup and output video via FFmpeg, and
 2) frameworks that let you define a full video declaratively and render it programmatically.
 
 ***
@@ -115,12 +115,12 @@ When looking for OSS “clones”, the closest matches are:
 **Why it’s relevant**
 
 - Like story‑json‑to‑video, it takes JSON that follows a defined schema and emits videos, directly mirroring the JSON‑to‑video concept. [creatomate](https://creatomate.com/blog/json-to-video-practical-examples)
-- Being C‑based, it’s a low‑level example of how one might parse JSON and drive FFmpeg or similar tools to generate videos.  
+- Being C‑based, it’s a low‑level example of how one might parse JSON and drive FFmpeg or similar tools to generate videos.
 
 **Limitations**
 
 - There’s no public documentation in the snippet about the exact JSON schema or features; the project has no stars and appears experimental. [github](https://github.com/ChuckGarcian/CJV-Command-Line)
-- It’s CLI‑only; adding a Creatomate‑style API would be a significant additional build.  
+- It’s CLI‑only; adding a Creatomate‑style API would be a significant additional build.
 
 ***
 
@@ -138,7 +138,7 @@ When looking for OSS “clones”, the closest matches are:
 **Differences**
 
 - There’s no generic JSON timeline/template schema; it’s a specific “script → short video” pipeline, not a general editing API. [github](https://github.com/Arabianaischool/AI-Video-Gen-by-ARABIAN-AI-SCHOOL)
-- Again, CLI/server script, not a templated REST platform.  
+- Again, CLI/server script, not a templated REST platform.
 
 ***
 
@@ -153,18 +153,18 @@ When looking for OSS “clones”, the closest matches are:
 **How it maps to Creatomate/JSON2Video**
 
 - It gives you a full code‑driven composition system (dynamic text, data binding, animations, etc.), much like Creatomate/JSON2Video templates, but authoring is React code instead of JSON. [dev](https://dev.to/mayu2008/new-clauderemotion-to-create-amazing-videos-using-ai-37bp)
-- The official ecosystem supports server‑side rendering to MP4 and you can build API layers that accept JSON and translate to props for React components.  
+- The official ecosystem supports server‑side rendering to MP4 and you can build API layers that accept JSON and translate to props for React components.
 
 **Why it’s not a “clone”**
 
 - Out of the box, it’s a library/framework, not an HTTP API with template/version management, webhooks, etc. [github](https://github.com/remotion-dev/remotion)
-- You’d be building a fair bit of infra to get to “Creatomate‑as‑a‑service” using Remotion as the render engine.  
+- You’d be building a fair bit of infra to get to “Creatomate‑as‑a‑service” using Remotion as the render engine.
 
 ***
 
 ### 8. OpenShot Cloud API + SDKs (commercial API on OSS core)
 
-**Core editor repo:** https://github.com/OpenShot/openshot-qt (GUI) – not itself an API, but the base editor.  
+**Core editor repo:** https://github.com/OpenShot/openshot-qt (GUI) – not itself an API, but the base editor.
 **Go SDK:** https://github.com/Bimde/openshot-sdk-go [github](https://github.com/Bimde/openshot-sdk-go)
 
 - OpenShot Cloud API is a paid SaaS that exposes a RESTful video editing API built on the open‑source OpenShot editor; their docs show how to create projects, upload media, add clips, apply preset animations, and export via HTTP. [openshot](https://www.openshot.org/cloud-api/)
