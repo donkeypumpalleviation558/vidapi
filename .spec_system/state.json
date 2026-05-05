@@ -52,7 +52,8 @@
     "phase02-session03-webhook-delivery-system",
     "phase02-session04-transitions-and-positioning",
     "phase02-session05-audio-polish-and-hardening",
-    "phase03-session01-postgresql-persistence-and-alembic-migrations"
+    "phase03-session01-postgresql-persistence-and-alembic-migrations",
+    "phase03-session02-s3-compatible-storage-and-download-modes"
   ],
   "next_session_history": [
     {
