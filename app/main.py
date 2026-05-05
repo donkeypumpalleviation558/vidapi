@@ -11,8 +11,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.errors import register_error_handlers
 from app.api.routes_health import router as health_router
+from app.api.routes_renders import router as renders_router
 from app.core.config import get_settings
 from app.core.logging import setup_logging
+from app.db.session import create_tables, dispose_engine
 
 logger = structlog.get_logger(__name__)
 
@@ -21,6 +23,7 @@ logger = structlog.get_logger(__name__)
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     setup_logging(log_level=settings.log_level, json_output=not settings.debug)
+    await create_tables()
     await logger.ainfo(
         "startup",
         app_name=settings.app_name,
@@ -28,6 +31,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         debug=settings.debug,
     )
     yield
+    await dispose_engine()
     await logger.ainfo("shutdown")
 
 
@@ -64,6 +68,7 @@ def create_app() -> FastAPI:
     register_error_handlers(app)
 
     app.include_router(health_router, prefix="/v1")
+    app.include_router(renders_router, prefix="/v1")
 
     return app
 

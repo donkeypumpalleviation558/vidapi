@@ -9,7 +9,7 @@
     "0": {
       "name": "Foundation",
       "description": "Prove the core JSON-to-video loop locally with FastAPI, Pydantic schema, Editly renderer, and synchronous render service",
-      "status": "in_progress",
+      "status": "complete",
       "session_count": 5
     },
     "1": {
@@ -37,7 +37,8 @@
     "phase00-session01-project-skeleton-and-config",
     "phase00-session02-composition-schema-and-db-models",
     "phase00-session03-storage-and-asset-service",
-    "phase00-session04-editly-renderer-and-segment-compiler"
+    "phase00-session04-editly-renderer-and-segment-compiler",
+    "phase00-session05-render-service-and-api-endpoints"
   ],
   "next_session_history": [
     {
@@ -93,6 +94,21 @@
     {
       "date": "2026-05-05",
       "session": "phase00-session04-editly-renderer-and-segment-compiler",
+      "status": "completed"
+    },
+    {
+      "date": "2026-05-05",
+      "session": "phase00-session05-render-service-and-api-endpoints",
+      "status": "planned"
+    },
+    {
+      "date": "2026-05-05",
+      "session": "phase00-session05-render-service-and-api-endpoints",
+      "status": "validated"
+    },
+    {
+      "date": "2026-05-05",
+      "session": "phase00-session05-render-service-and-api-endpoints",
       "status": "completed"
     }
   ]

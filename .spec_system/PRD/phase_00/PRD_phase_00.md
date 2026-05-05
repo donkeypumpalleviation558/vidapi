@@ -1,10 +1,10 @@
 # PRD Phase 00: Foundation
 
-**Status**: In Progress
+**Status**: Complete
 **Sessions**: 5 (initial estimate)
 **Estimated Duration**: 10-20 hours
 
-**Progress**: 4/5 sessions (80%)
+**Progress**: 5/5 sessions (100%)
 
 ---
 
@@ -22,7 +22,7 @@ Prove the core JSON-to-video loop locally. Build the FastAPI skeleton, Pydantic 
 | 02 | Composition Schema and DB Models | Complete | 20 | 2026-05-05 |
 | 03 | Storage and Asset Service | Complete | 20 | 2026-05-05 |
 | 04 | Editly Renderer and Segment Compiler | Complete | 22 | 2026-05-05 |
-| 05 | Render Service and API Endpoints | Not Started | ~15-20 | - |
+| 05 | Render Service and API Endpoints | Complete | 20 | 2026-05-05 |
 
 ---
 
@@ -32,12 +32,13 @@ Prove the core JSON-to-video loop locally. Build the FastAPI skeleton, Pydantic 
 - **Session 02: Composition Schema and DB Models** -- Completed 2026-05-05. Delivered Pydantic v2 composition schema with discriminated unions for 5 asset types, Output model with resolution presets and quality mapping, Render SQLModel with status state machine, Alembic migration infrastructure, 20/20 tasks, 82/82 tests.
 - **Session 03: Storage and Asset Service** -- Completed 2026-05-05. Delivered storage protocol and local filesystem adapter, secure asset resolution service with SSRF protection, SHA-256 content-addressed asset cache, ffprobe async wrapper, Pillow text-to-image renderer, 20/20 tasks, 163/163 tests.
 - **Session 04: Editly Renderer and Segment Compiler** -- Completed 2026-05-05. Delivered renderer protocol with compile/render methods, Editly renderer bridge with segment compiler, layer mappers for video/image/text/color/audio assets, poster generation via FFmpeg, replay metadata, 22/22 tasks, 209/209 tests.
+- **Session 05: Render Service and API Endpoints** -- Completed 2026-05-05. Delivered render service pipeline orchestrator, render CRUD operations, merge variable expansion, POST/GET/download API endpoints, golden-path E2E test, 20/20 tasks, 226/226 tests.
 
 ---
 
 ## Upcoming Sessions
 
-- Session 05: Render Service and API Endpoints
+None -- all Phase 00 sessions complete.
 
 ---
 
@@ -92,7 +93,7 @@ Prove the core JSON-to-video loop locally. Build the FastAPI skeleton, Pydantic 
 ## Success Criteria
 
 Phase complete when:
-- [ ] All 5 sessions completed
+- [x] All 5 sessions completed
 - [ ] FastAPI app serves /v1/health
 - [ ] Pydantic models validate VidAPI composition JSON
 - [ ] SQLite stores render metadata with proper status tracking
