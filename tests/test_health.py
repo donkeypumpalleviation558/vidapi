@@ -14,9 +14,11 @@ async def test_health_returns_200(client: AsyncClient) -> None:
 async def test_health_response_shape(client: AsyncClient) -> None:
     response = await client.get("/v1/health")
     data = response.json()
-    assert data["status"] == "ok"
+    assert data["status"] in ("healthy", "degraded")
     assert "service" in data
     assert "version" in data
+    assert "database" in data
+    assert "timestamp" in data
 
 
 @pytest.mark.asyncio

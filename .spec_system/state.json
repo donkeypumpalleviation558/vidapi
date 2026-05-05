@@ -2,7 +2,7 @@
   "version": "2.0",
   "project_name": "VidAPI",
   "description": "Self-hosted Python FastAPI service that replicates Creatomate/JSON2Video behavior - accepts JSON timeline compositions and renders video via FFmpeg",
-  "current_phase": 0,
+  "current_phase": 1,
   "current_session": null,
   "monorepo": false,
   "phases": {
@@ -14,8 +14,9 @@
     },
     "1": {
       "name": "Async Jobs and Multi-track",
-      "status": "not_started",
-      "session_count": 0
+      "description": "Move rendering to async ARQ workers, implement full status state machine with progress, job cancellation, multi-track compositing with z-order, audio mixing, and Docker Compose stack",
+      "status": "in_progress",
+      "session_count": 5
     },
     "2": {
       "name": "Templates and Polish",
@@ -38,7 +39,8 @@
     "phase00-session02-composition-schema-and-db-models",
     "phase00-session03-storage-and-asset-service",
     "phase00-session04-editly-renderer-and-segment-compiler",
-    "phase00-session05-render-service-and-api-endpoints"
+    "phase00-session05-render-service-and-api-endpoints",
+    "phase01-session01-redis-arq-queue-integration"
   ],
   "next_session_history": [
     {
@@ -109,6 +111,21 @@
     {
       "date": "2026-05-05",
       "session": "phase00-session05-render-service-and-api-endpoints",
+      "status": "completed"
+    },
+    {
+      "date": "2026-05-05",
+      "session": "phase01-session01-redis-arq-queue-integration",
+      "status": "planned"
+    },
+    {
+      "date": "2026-05-05",
+      "session": "phase01-session01-redis-arq-queue-integration",
+      "status": "validated"
+    },
+    {
+      "date": "2026-05-05",
+      "session": "phase01-session01-redis-arq-queue-integration",
       "status": "completed"
     }
   ]

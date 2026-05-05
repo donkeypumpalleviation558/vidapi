@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-import pytest
-
 from app.models.composition import (
-    AudioAsset,
     Clip,
     ColorAsset,
-    FitMode,
     ImageAsset,
     TextAsset,
     Track,
@@ -14,8 +10,6 @@ from app.models.composition import (
 )
 from app.renderers.editly import (
     EPSILON,
-    ActiveClip,
-    Segment,
     collect_boundaries,
     compute_total_duration,
     generate_segments,

@@ -11,6 +11,7 @@ from app.models.composition import Composition
 # Render Status Enum with State Machine
 # ---------------------------------------------------------------------------
 
+
 class RenderStatus(StrEnum):
     QUEUED = "queued"
     FETCHING = "fetching"
@@ -29,9 +30,7 @@ class RenderStatus(StrEnum):
 
     def transition_to(self, target: RenderStatus) -> RenderStatus:
         if not self.can_transition_to(target):
-            msg = (
-                f"Invalid status transition: {self.value} -> {target.value}"
-            )
+            msg = f"Invalid status transition: {self.value} -> {target.value}"
             raise ValueError(msg)
         return target
 
@@ -41,50 +40,65 @@ class RenderStatus(StrEnum):
 
 
 _TRANSITIONS: dict[RenderStatus, frozenset[RenderStatus]] = {
-    RenderStatus.QUEUED: frozenset({
-        RenderStatus.FETCHING,
-        RenderStatus.CANCELLED,
-        RenderStatus.FAILED,
-    }),
-    RenderStatus.FETCHING: frozenset({
-        RenderStatus.COMPILING,
-        RenderStatus.FAILED,
-    }),
-    RenderStatus.COMPILING: frozenset({
-        RenderStatus.RENDERING,
-        RenderStatus.FAILED,
-    }),
-    RenderStatus.RENDERING: frozenset({
-        RenderStatus.UPLOADING,
-        RenderStatus.FAILED,
-    }),
-    RenderStatus.UPLOADING: frozenset({
-        RenderStatus.SUCCEEDED,
-        RenderStatus.FAILED,
-    }),
+    RenderStatus.QUEUED: frozenset(
+        {
+            RenderStatus.FETCHING,
+            RenderStatus.CANCELLED,
+            RenderStatus.FAILED,
+        }
+    ),
+    RenderStatus.FETCHING: frozenset(
+        {
+            RenderStatus.COMPILING,
+            RenderStatus.FAILED,
+        }
+    ),
+    RenderStatus.COMPILING: frozenset(
+        {
+            RenderStatus.RENDERING,
+            RenderStatus.FAILED,
+        }
+    ),
+    RenderStatus.RENDERING: frozenset(
+        {
+            RenderStatus.UPLOADING,
+            RenderStatus.FAILED,
+        }
+    ),
+    RenderStatus.UPLOADING: frozenset(
+        {
+            RenderStatus.SUCCEEDED,
+            RenderStatus.FAILED,
+        }
+    ),
     RenderStatus.SUCCEEDED: frozenset(),
     RenderStatus.FAILED: frozenset(),
     RenderStatus.CANCELLED: frozenset(),
 }
 
-_TERMINAL_STATES: frozenset[RenderStatus] = frozenset({
-    RenderStatus.SUCCEEDED,
-    RenderStatus.FAILED,
-    RenderStatus.CANCELLED,
-})
+_TERMINAL_STATES: frozenset[RenderStatus] = frozenset(
+    {
+        RenderStatus.SUCCEEDED,
+        RenderStatus.FAILED,
+        RenderStatus.CANCELLED,
+    }
+)
 
 
 # ---------------------------------------------------------------------------
 # Request / Response Models
 # ---------------------------------------------------------------------------
 
+
 class CreateRenderRequest(BaseModel):
     """Client request body for POST /v1/renders."""
+
     composition: Composition
 
 
 class CreateRenderResponse(BaseModel):
     """Immediate response for POST /v1/renders."""
+
     id: str
     status: RenderStatus
     progress: int = 0
@@ -93,6 +107,7 @@ class CreateRenderResponse(BaseModel):
 
 class RenderResponse(BaseModel):
     """Full render status response for GET /v1/renders/{id}."""
+
     id: str
     status: RenderStatus
     stage: str | None = None
@@ -108,5 +123,6 @@ class RenderResponse(BaseModel):
 
 class RenderError(BaseModel):
     """Error detail embedded in RenderResponse."""
+
     code: str
     message: str

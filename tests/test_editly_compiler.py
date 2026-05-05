@@ -7,7 +7,6 @@ import pytest
 
 from app.models.composition import (
     AudioAsset,
-    AudioEffect,
     Clip,
     ColorAsset,
     Composition,
@@ -22,20 +21,18 @@ from app.models.composition import (
 from app.renderers.editly import (
     ActiveClip,
     EditlyRenderer,
+    _fit_mode_to_resize,
     assemble_editly_spec,
-    generate_segments,
     collect_boundaries,
     compute_total_duration,
-    map_clip_to_layer,
+    generate_segments,
     map_color_layer,
     map_image_layer,
     map_soundtrack,
     map_text_png_layer,
     map_video_layer,
     serialize_spec,
-    _fit_mode_to_resize,
 )
-
 
 # ---------------------------------------------------------------------------
 # Layer Mapper Unit Tests
@@ -213,20 +210,24 @@ class TestAssembleEditlySpec:
         return Composition(
             timeline=Timeline(
                 tracks=[
-                    Track(clips=[
-                        Clip(
-                            asset=ImageAsset(type="image", src="/bg.png"),
-                            start=0.0,
-                            length=5.0,
-                        ),
-                    ]),
-                    Track(clips=[
-                        Clip(
-                            asset=TextAsset(type="text", text="Title"),
-                            start=1.0,
-                            length=3.0,
-                        ),
-                    ]),
+                    Track(
+                        clips=[
+                            Clip(
+                                asset=ImageAsset(type="image", src="/bg.png"),
+                                start=0.0,
+                                length=5.0,
+                            ),
+                        ]
+                    ),
+                    Track(
+                        clips=[
+                            Clip(
+                                asset=TextAsset(type="text", text="Title"),
+                                start=1.0,
+                                length=3.0,
+                            ),
+                        ]
+                    ),
                 ],
                 soundtrack=AudioAsset(type="audio", src="/music.mp3", volume=0.8),
             ),
@@ -270,18 +271,20 @@ class TestAssembleEditlySpec:
         comp = Composition(
             timeline=Timeline(
                 tracks=[
-                    Track(clips=[
-                        Clip(
-                            asset=VideoAsset(type="video", src="v.mp4"),
-                            start=0.0,
-                            length=2.0,
-                        ),
-                        Clip(
-                            asset=VideoAsset(type="video", src="v2.mp4"),
-                            start=4.0,
-                            length=1.0,
-                        ),
-                    ]),
+                    Track(
+                        clips=[
+                            Clip(
+                                asset=VideoAsset(type="video", src="v.mp4"),
+                                start=0.0,
+                                length=2.0,
+                            ),
+                            Clip(
+                                asset=VideoAsset(type="video", src="v2.mp4"),
+                                start=4.0,
+                                length=1.0,
+                            ),
+                        ]
+                    ),
                 ],
                 background="#333333",
             ),
@@ -305,13 +308,15 @@ class TestEditlyRendererCompile:
         comp = Composition(
             timeline=Timeline(
                 tracks=[
-                    Track(clips=[
-                        Clip(
-                            asset=ImageAsset(type="image", src="/bg.png"),
-                            start=0.0,
-                            length=5.0,
-                        ),
-                    ]),
+                    Track(
+                        clips=[
+                            Clip(
+                                asset=ImageAsset(type="image", src="/bg.png"),
+                                start=0.0,
+                                length=5.0,
+                            ),
+                        ]
+                    ),
                 ],
             ),
             output=Output(width=1920, height=1080, fps=30),
@@ -334,13 +339,15 @@ class TestEditlyRendererCompile:
         comp = Composition(
             timeline=Timeline(
                 tracks=[
-                    Track(clips=[
-                        Clip(
-                            asset=ColorAsset(type="color", color="#000"),
-                            start=0.0,
-                            length=3.0,
-                        ),
-                    ]),
+                    Track(
+                        clips=[
+                            Clip(
+                                asset=ColorAsset(type="color", color="#000"),
+                                start=0.0,
+                                length=3.0,
+                            ),
+                        ]
+                    ),
                 ],
             ),
             output=Output(width=1280, height=720, fps=24),
@@ -360,13 +367,15 @@ class TestEditlyRendererCompile:
         comp = Composition(
             timeline=Timeline(
                 tracks=[
-                    Track(clips=[
-                        Clip(
-                            asset=ImageAsset(type="image", src="/bg.png"),
-                            start=0.0,
-                            length=5.0,
-                        ),
-                    ]),
+                    Track(
+                        clips=[
+                            Clip(
+                                asset=ImageAsset(type="image", src="/bg.png"),
+                                start=0.0,
+                                length=5.0,
+                            ),
+                        ]
+                    ),
                 ],
             ),
             output=Output(width=1920, height=1080, fps=30),

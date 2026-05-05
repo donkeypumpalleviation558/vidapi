@@ -1,15 +1,9 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
-from unittest.mock import AsyncMock
-
 import pytest
 from httpx import AsyncClient
 
-from app.models.composition import Composition
 from app.services.merge import MergeError, expand_merge_variables
-
 
 # ---------------------------------------------------------------------------
 # Merge variable expansion unit tests
@@ -76,11 +70,7 @@ class TestPostRenders:
 
     @pytest.mark.asyncio
     async def test_empty_tracks_returns_422(self, client: AsyncClient):
-        payload = {
-            "timeline": {
-                "tracks": []
-            }
-        }
+        payload = {"timeline": {"tracks": []}}
         response = await client.post("/v1/renders", json=payload)
         assert response.status_code == 422
 
@@ -92,8 +82,11 @@ class TestPostRenders:
                     {
                         "clips": [
                             {
-                                "asset": {"type": "image", "src": "http://example.com/img.jpg"},
-                                "start": 0.0
+                                "asset": {
+                                    "type": "image",
+                                    "src": "http://example.com/img.jpg",
+                                },
+                                "start": 0.0,
                             }
                         ]
                     }

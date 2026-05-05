@@ -21,6 +21,9 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite+aiosqlite:///./data/vidapi.db"
 
+    redis_url: str = "redis://localhost:6379"
+    render_mode: Literal["sync", "async"] = "sync"
+
     storage_root: Path = Path("data")
     render_workspace_root: Path = Path("data/renders")
     asset_cache_root: Path = Path("data/assets")

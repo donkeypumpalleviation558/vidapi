@@ -14,6 +14,7 @@ from app.api.routes_health import router as health_router
 from app.api.routes_renders import router as renders_router
 from app.core.config import get_settings
 from app.core.logging import setup_logging
+from app.core.redis import close_arq_pool, create_arq_pool
 from app.db.session import create_tables, dispose_engine
 
 logger = structlog.get_logger(__name__)
@@ -24,13 +25,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     setup_logging(log_level=settings.log_level, json_output=not settings.debug)
     await create_tables()
+
+    if settings.render_mode == "async":
+        await create_arq_pool()
+        await logger.ainfo("redis_pool_created", redis_url=settings.redis_url)
+
     await logger.ainfo(
         "startup",
         app_name=settings.app_name,
         version=settings.app_version,
         debug=settings.debug,
+        render_mode=settings.render_mode,
     )
     yield
+
+    if settings.render_mode == "async":
+        await close_arq_pool()
+
     await dispose_engine()
     await logger.ainfo("shutdown")
 
@@ -67,6 +78,7 @@ def create_app() -> FastAPI:
 
     register_error_handlers(app)
 
+    app.include_router(health_router)
     app.include_router(health_router, prefix="/v1")
     app.include_router(renders_router, prefix="/v1")
 

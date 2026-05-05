@@ -3,10 +3,12 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Annotated
 
+from arq.connections import ArqRedis
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
+from app.core.redis import get_arq_pool
 from app.db.session import get_session
 from app.renderers.editly import EditlyRenderer
 from app.services.asset_service import AssetService
@@ -15,6 +17,20 @@ from app.storage.local import LocalStorage
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 DBSessionDep = Annotated[AsyncSession, Depends(get_session)]
+
+
+async def get_arq_pool_dep() -> ArqRedis | None:
+    """Dependency that provides the ARQ Redis pool for routes.
+
+    Returns None when RENDER_MODE=sync to avoid requiring Redis.
+    """
+    settings = get_settings()
+    if settings.render_mode != "async":
+        return None
+    return await get_arq_pool()
+
+
+ArqPoolDep = Annotated[ArqRedis | None, Depends(get_arq_pool_dep)]
 
 
 @lru_cache(maxsize=1)

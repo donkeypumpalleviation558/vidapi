@@ -16,6 +16,7 @@ from pydantic import (
 # Enums
 # ---------------------------------------------------------------------------
 
+
 class FitMode(StrEnum):
     COVER = "cover"
     CONTAIN = "contain"
@@ -120,10 +121,7 @@ def resolve_resolution(
     """Return (width, height) for a resolution + aspect ratio pair."""
     key = (resolution, aspect_ratio)
     if key not in RESOLUTION_TABLE:
-        msg = (
-            f"No resolution mapping for {resolution.value} "
-            f"at {aspect_ratio.value}"
-        )
+        msg = f"No resolution mapping for {resolution.value} at {aspect_ratio.value}"
         raise ValueError(msg)
     return RESOLUTION_TABLE[key]
 
@@ -132,8 +130,10 @@ def resolve_resolution(
 # Value Objects (frozen / immutable)
 # ---------------------------------------------------------------------------
 
+
 class CoordinatePosition(BaseModel):
     """Normalized (0.0-1.0) coordinate pair."""
+
     model_config = ConfigDict(frozen=True)
 
     x: float = Field(ge=0.0, le=1.0)
@@ -159,6 +159,7 @@ class Transition(BaseModel):
 
 class Transform(BaseModel):
     """Placeholder for rotation/skew/keyframe support."""
+
     model_config = ConfigDict(frozen=True)
 
     rotation: float = 0.0
@@ -169,6 +170,7 @@ class Transform(BaseModel):
 # ---------------------------------------------------------------------------
 # Asset types (discriminated union on `type`)
 # ---------------------------------------------------------------------------
+
 
 class VideoAsset(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -227,6 +229,7 @@ Asset = Annotated[
 # Clip
 # ---------------------------------------------------------------------------
 
+
 class Clip(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -253,6 +256,7 @@ class Clip(BaseModel):
 # Track / Timeline
 # ---------------------------------------------------------------------------
 
+
 class Track(BaseModel):
     clips: list[Clip] = Field(min_length=1)
 
@@ -266,6 +270,7 @@ class Timeline(BaseModel):
 # ---------------------------------------------------------------------------
 # Output
 # ---------------------------------------------------------------------------
+
 
 class Output(BaseModel):
     format: OutputFormat = OutputFormat.MP4
@@ -315,6 +320,7 @@ RendererChoice = Literal["auto", "editly", "ffmpeg-native", "hyperframes"]
 # ---------------------------------------------------------------------------
 # Composition (top-level)
 # ---------------------------------------------------------------------------
+
 
 class Composition(BaseModel):
     timeline: Timeline

@@ -23,9 +23,7 @@ async def get_render_by_id(
     render_id: str,
 ) -> Render | None:
     """Return a render by ID or None if not found."""
-    result = await session.execute(
-        select(Render).where(Render.id == render_id)
-    )
+    result = await session.execute(select(Render).where(Render.id == render_id))
     return result.scalar_one_or_none()
 
 

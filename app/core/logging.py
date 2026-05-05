@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import json
 import logging
 import sys
+import traceback
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 import structlog
+
+LOGS_DIR = Path(__file__).resolve().parent.parent.parent / "logs"
 
 
 def setup_logging(log_level: str = "INFO", json_output: bool = True) -> None:
@@ -55,3 +62,28 @@ def setup_logging(log_level: str = "INFO", json_output: bool = True) -> None:
 
 def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
     return structlog.get_logger(name)  # type: ignore[no-any-return]
+
+
+def write_last_error(
+    exc: BaseException,
+    *,
+    context: dict[str, Any] | None = None,
+) -> Path:
+    """Write structured error JSON to logs/last_error_<timestamp>.json."""
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(tz=UTC)
+    payload = {
+        "timestamp": ts.isoformat(),
+        "level": "error",
+        "msg": str(exc),
+        "error": {
+            "type": type(exc).__name__,
+            "message": str(exc),
+            "stack": traceback.format_exception(exc),
+        },
+        "context": context or {},
+    }
+    safe_ts = ts.strftime("%Y-%m-%dT%H_%M_%S_%fZ")
+    path = LOGS_DIR / f"last_error_{safe_ts}.json"
+    path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+    return path

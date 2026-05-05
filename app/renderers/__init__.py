@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from app.renderers.base import (
-    CompileError,
     CompiledRender,
+    CompileError,
     RenderArtifact,
-    RenderError,
     RendererProtocol,
+    RenderError,
 )
 from app.renderers.editly import EditlyRenderer
 from app.renderers.poster import PosterError, generate_poster
 
-_RENDERER_REGISTRY: dict[str, type] = {
+_RENDERER_REGISTRY: dict[str, type[RendererProtocol]] = {
     "editly": EditlyRenderer,
 }
 
@@ -22,9 +22,11 @@ def get_renderer(name: str | None = None) -> RendererProtocol:
 
     renderer_cls = _RENDERER_REGISTRY.get(name)
     if renderer_cls is None:
-        raise ValueError(f"Unknown renderer: {name!r}. Available: {list(_RENDERER_REGISTRY)}")
+        raise ValueError(
+            f"Unknown renderer: {name!r}. Available: {list(_RENDERER_REGISTRY)}"
+        )
 
-    return renderer_cls()  # type: ignore[return-value]
+    return renderer_cls()
 
 
 __all__ = [

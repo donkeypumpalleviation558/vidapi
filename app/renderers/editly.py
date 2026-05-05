@@ -5,8 +5,9 @@ import json
 import os
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import structlog
 
@@ -23,8 +24,8 @@ from app.models.composition import (
     VideoAsset,
 )
 from app.renderers.base import (
-    CompileError,
     CompiledRender,
+    CompileError,
     RenderArtifact,
     RenderError,
 )
@@ -128,7 +129,9 @@ def generate_segments(
                     )
 
         active_clips.sort(key=lambda ac: ac.track_index)
-        segments.append(Segment(start=seg_start, end=seg_end, active_clips=active_clips))
+        segments.append(
+            Segment(start=seg_start, end=seg_end, active_clips=active_clips)
+        )
 
     return segments
 
@@ -160,10 +163,10 @@ def _fit_mode_to_resize(fit: FitMode) -> str | None:
     return mapping.get(fit)
 
 
-def map_video_layer(clip: Clip, active_clip: ActiveClip) -> dict:
+def map_video_layer(clip: Clip, active_clip: ActiveClip) -> dict[str, Any]:
     """Map a video asset clip to an Editly layer."""
     asset: VideoAsset = clip.asset  # type: ignore[assignment]
-    layer: dict = {
+    layer: dict[str, Any] = {
         "type": "video",
         "path": asset.src,
     }
@@ -175,7 +178,9 @@ def map_video_layer(clip: Clip, active_clip: ActiveClip) -> dict:
     if asset.trim is not None or active_clip.clip_offset > EPSILON:
         cut_from = (asset.trim or 0.0) + active_clip.clip_offset
         layer["cutFrom"] = round(cut_from, 6)
-        layer["cutTo"] = round(cut_from + (active_clip.clip.length - active_clip.clip_offset), 6)
+        layer["cutTo"] = round(
+            cut_from + (active_clip.clip.length - active_clip.clip_offset), 6
+        )
     elif active_clip.clip_offset > EPSILON:
         layer["cutFrom"] = round(active_clip.clip_offset, 6)
 
@@ -185,10 +190,10 @@ def map_video_layer(clip: Clip, active_clip: ActiveClip) -> dict:
     return layer
 
 
-def map_image_layer(clip: Clip) -> dict:
+def map_image_layer(clip: Clip) -> dict[str, Any]:
     """Map an image asset clip to an Editly image-overlay layer."""
     asset: ImageAsset = clip.asset  # type: ignore[assignment]
-    layer: dict = {
+    layer: dict[str, Any] = {
         "type": "image-overlay",
         "path": asset.src,
     }
@@ -200,30 +205,30 @@ def map_image_layer(clip: Clip) -> dict:
     return layer
 
 
-def map_text_png_layer(clip: Clip) -> dict:
+def map_text_png_layer(clip: Clip) -> dict[str, Any]:
     """Map a text asset (pre-rendered to PNG) to an Editly image-overlay layer.
 
     The text_renderer from Session 03 produces a PNG path that we reference here.
     The actual path resolution happens during compile when asset paths are resolved.
     """
-    layer: dict = {
+    layer: dict[str, Any] = {
         "type": "image-overlay",
         "path": "",
     }
     return layer
 
 
-def map_color_layer(clip: Clip) -> dict:
+def map_color_layer(clip: Clip) -> dict[str, Any]:
     """Map a color asset to an Editly fill-color background layer."""
     asset: ColorAsset = clip.asset  # type: ignore[assignment]
-    layer: dict = {
+    layer: dict[str, Any] = {
         "type": "fill-color",
         "color": asset.color,
     }
     return layer
 
 
-def map_clip_to_layer(clip: Clip, active_clip: ActiveClip) -> dict | None:
+def map_clip_to_layer(clip: Clip, active_clip: ActiveClip) -> dict[str, Any] | None:
     """Route a clip to the appropriate layer mapper based on asset type."""
     asset = clip.asset
 
@@ -246,12 +251,12 @@ def map_clip_to_layer(clip: Clip, active_clip: ActiveClip) -> dict | None:
 # ---------------------------------------------------------------------------
 
 
-def map_soundtrack(soundtrack: AudioAsset | None) -> list[dict]:
+def map_soundtrack(soundtrack: AudioAsset | None) -> list[dict[str, Any]]:
     """Map VidAPI soundtrack to Editly audioTracks."""
     if soundtrack is None:
         return []
 
-    track: dict = {
+    track: dict[str, Any] = {
         "path": soundtrack.src,
     }
 
@@ -279,19 +284,23 @@ def assemble_editly_spec(
     output_path: str,
     *,
     asset_path_resolver: dict[str, str] | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Assemble the full Editly JSON spec from segments and composition settings."""
-    clips: list[dict] = []
+    clips: list[dict[str, Any]] = []
 
     for segment in segments:
         if not segment.active_clips:
-            clips.append({
-                "duration": round(segment.duration, 6),
-                "layers": [{"type": "fill-color", "color": composition.timeline.background}],
-            })
+            clips.append(
+                {
+                    "duration": round(segment.duration, 6),
+                    "layers": [
+                        {"type": "fill-color", "color": composition.timeline.background}
+                    ],
+                }
+            )
             continue
 
-        layers: list[dict] = []
+        layers: list[dict[str, Any]] = []
         for active_clip in segment.active_clips:
             layer = map_clip_to_layer(active_clip.clip, active_clip)
             if layer is None:
@@ -307,12 +316,14 @@ def assemble_editly_spec(
         if not layers:
             layers = [{"type": "fill-color", "color": composition.timeline.background}]
 
-        clips.append({
-            "duration": round(segment.duration, 6),
-            "layers": layers,
-        })
+        clips.append(
+            {
+                "duration": round(segment.duration, 6),
+                "layers": layers,
+            }
+        )
 
-    spec: dict = {
+    spec: dict[str, Any] = {
         "width": composition.output.width,
         "height": composition.output.height,
         "fps": composition.output.fps,
@@ -332,7 +343,7 @@ def assemble_editly_spec(
     return spec
 
 
-def serialize_spec(spec: dict) -> str:
+def serialize_spec(spec: dict[str, Any]) -> str:
     """Deterministic JSON serialization for compiled Editly specs."""
     return json.dumps(spec, sort_keys=True, indent=2, ensure_ascii=True)
 
@@ -348,14 +359,14 @@ def generate_replay_metadata(
     workspace: Path,
     *,
     settings: Settings | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Capture Editly executable path, args, env, and paths for manual re-run."""
     if settings is None:
         settings = get_settings()
 
     return {
         "renderer": "editly",
-        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+        "timestamp": datetime.now(tz=UTC).isoformat(),
         "command": settings.editly_bin,
         "args": ["--json", str(spec_path)],
         "environment": {
@@ -474,9 +485,7 @@ class EditlyRenderer:
         if total_duration < EPSILON:
             raise CompileError("Composition has zero duration")
 
-        boundaries = collect_boundaries(
-            composition.timeline.tracks, total_duration
-        )
+        boundaries = collect_boundaries(composition.timeline.tracks, total_duration)
         segments = generate_segments(boundaries, composition.timeline.tracks)
 
         if not segments:

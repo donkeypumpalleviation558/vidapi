@@ -12,6 +12,7 @@ from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
 
 from app.api.deps import (
+    get_arq_pool_dep,
     get_asset_service,
     get_editly_renderer,
     get_local_storage,
@@ -155,6 +156,7 @@ async def client(
     app.dependency_overrides[get_asset_service] = lambda: mock_asset_service
     app.dependency_overrides[get_editly_renderer] = lambda: mock_renderer
     app.dependency_overrides[get_render_service] = lambda: render_service
+    app.dependency_overrides[get_arq_pool_dep] = lambda: None
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

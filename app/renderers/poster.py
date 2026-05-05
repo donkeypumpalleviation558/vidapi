@@ -100,9 +100,13 @@ def build_poster_command(
     return [
         "ffmpeg",
         "-y",
-        "-ss", f"{seek_seconds:.3f}",
-        "-i", str(video_path),
-        "-frames:v", "1",
-        "-q:v", str(max(1, min(31, (100 - quality) * 31 // 100 + 1))),
+        "-ss",
+        f"{seek_seconds:.3f}",
+        "-i",
+        str(video_path),
+        "-frames:v",
+        "1",
+        "-q:v",
+        str(max(1, min(31, (100 - quality) * 31 // 100 + 1))),
         str(output_path),
     ]

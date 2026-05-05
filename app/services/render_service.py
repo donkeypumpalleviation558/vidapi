@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import structlog
@@ -14,7 +13,6 @@ from app.models.composition import (
     Composition,
     ImageAsset,
     TextAsset,
-    Track,
     VideoAsset,
 )
 from app.models.render import RenderStatus
@@ -88,33 +86,50 @@ class RenderService:
             workspace = await self._storage.create_workspace(render_id)
 
             expanded_composition = await self._stage_validate_and_expand(
-                composition, render_id, workspace, session,
+                composition,
+                render_id,
+                workspace,
+                session,
             )
 
             compiled = await self._stage_resolve_and_compile(
-                expanded_composition, render_id, workspace, session,
+                expanded_composition,
+                render_id,
+                workspace,
+                session,
             )
 
             await self._stage_render_and_store(
-                expanded_composition, compiled, render_id, workspace, session,
+                expanded_composition,
+                compiled,
+                render_id,
+                workspace,
+                session,
             )
 
-            render = await render_crud.update_render_status(
+            updated = await render_crud.update_render_status(
                 session,
                 render_id,
                 RenderStatus.SUCCEEDED,
                 stage="complete",
                 progress=100,
             )
+            if updated is not None:
+                render = updated
             await logger.ainfo("render_pipeline_succeeded", render_id=render_id)
 
         except Exception as exc:
             await self._handle_failure(
-                render_id, session, workspace, exc,
+                render_id,
+                session,
+                workspace,
+                exc,
             )
-            render = await render_crud.get_render_by_id(session, render_id)
+            failed = await render_crud.get_render_by_id(session, render_id)
+            if failed is not None:
+                render = failed
 
-        return render  # type: ignore[return-value]
+        return render
 
     # ------------------------------------------------------------------
     # Stage 1: validate + merge + persist input artifacts
@@ -128,24 +143,32 @@ class RenderService:
         session: AsyncSession,
     ) -> Composition:
         await render_crud.update_render_status(
-            session, render_id, RenderStatus.FETCHING,
-            stage="validating", progress=5,
+            session,
+            render_id,
+            RenderStatus.FETCHING,
+            stage="validating",
+            progress=5,
         )
 
         input_json = composition.model_dump_json(indent=2)
         input_path = workspace / "input.json"
         input_path.write_text(input_json, encoding="utf-8")
         await render_crud.update_render_paths(
-            session, render_id, input_path=str(input_path),
+            session,
+            render_id,
+            input_path=str(input_path),
         )
 
         try:
             expanded_json = expand_merge_variables(
-                input_json, composition.merge,
+                input_json,
+                composition.merge,
             )
         except MergeError as exc:
             raise RenderServiceError(
-                str(exc), error_code="MERGE_ERROR", cause=exc,
+                str(exc),
+                error_code="MERGE_ERROR",
+                cause=exc,
             ) from exc
 
         if expanded_json != input_json:
@@ -159,11 +182,15 @@ class RenderService:
             encoding="utf-8",
         )
         await render_crud.update_render_paths(
-            session, render_id, expanded_path=str(expanded_path),
+            session,
+            render_id,
+            expanded_path=str(expanded_path),
         )
 
         await logger.ainfo(
-            "stage_validate_complete", render_id=render_id, progress=10,
+            "stage_validate_complete",
+            render_id=render_id,
+            progress=10,
         )
         return expanded_composition
 
@@ -179,15 +206,21 @@ class RenderService:
         session: AsyncSession,
     ) -> object:
         await render_crud.update_render_status(
-            session, render_id, RenderStatus.COMPILING,
-            stage="resolving_assets", progress=20,
+            session,
+            render_id,
+            RenderStatus.COMPILING,
+            stage="resolving_assets",
+            progress=20,
         )
 
         asset_map = await self._resolve_all_assets(composition, workspace)
 
         await render_crud.update_render_status(
-            session, render_id, RenderStatus.COMPILING,
-            stage="compiling", progress=30,
+            session,
+            render_id,
+            RenderStatus.COMPILING,
+            stage="compiling",
+            progress=30,
         )
 
         try:
@@ -199,7 +232,9 @@ class RenderService:
             )
         except CompileError as exc:
             raise RenderServiceError(
-                str(exc), error_code="COMPILE_ERROR", cause=exc,
+                str(exc),
+                error_code="COMPILE_ERROR",
+                cause=exc,
             ) from exc
 
         await render_crud.update_render_paths(
@@ -211,7 +246,9 @@ class RenderService:
         )
 
         await logger.ainfo(
-            "stage_compile_complete", render_id=render_id, progress=40,
+            "stage_compile_complete",
+            render_id=render_id,
+            progress=40,
         )
         return compiled
 
@@ -232,15 +269,20 @@ class RenderService:
         compiled_render: CompiledRender = compiled  # type: ignore[assignment]
 
         await render_crud.update_render_status(
-            session, render_id, RenderStatus.RENDERING,
-            stage="rendering", progress=50,
+            session,
+            render_id,
+            RenderStatus.RENDERING,
+            stage="rendering",
+            progress=50,
         )
 
         try:
             artifact = await self._renderer.render(compiled_render)
         except RenderError as exc:
             raise RenderServiceError(
-                str(exc), error_code="RENDER_ERROR", cause=exc,
+                str(exc),
+                error_code="RENDER_ERROR",
+                cause=exc,
             ) from exc
 
         await render_crud.update_render_paths(
@@ -251,8 +293,11 @@ class RenderService:
         )
 
         await render_crud.update_render_status(
-            session, render_id, RenderStatus.UPLOADING,
-            stage="generating_poster", progress=85,
+            session,
+            render_id,
+            RenderStatus.UPLOADING,
+            stage="generating_poster",
+            progress=85,
         )
 
         poster_path: Path | None = None
@@ -264,24 +309,33 @@ class RenderService:
             )
         except PosterError:
             await logger.awarning(
-                "poster_generation_failed_nonfatal", render_id=render_id,
+                "poster_generation_failed_nonfatal",
+                render_id=render_id,
             )
 
         if poster_path is not None:
             await render_crud.update_render_paths(
-                session, render_id, poster_path=str(poster_path),
+                session,
+                render_id,
+                poster_path=str(poster_path),
             )
 
         log_path = workspace / "logs.txt"
         if artifact.log_path.exists():
-            log_content = artifact.log_path.read_text(encoding="utf-8", errors="replace")
+            log_content = artifact.log_path.read_text(
+                encoding="utf-8", errors="replace"
+            )
             log_path.write_text(log_content, encoding="utf-8")
             await render_crud.update_render_paths(
-                session, render_id, log_path=str(log_path),
+                session,
+                render_id,
+                log_path=str(log_path),
             )
 
         await logger.ainfo(
-            "stage_render_complete", render_id=render_id, progress=95,
+            "stage_render_complete",
+            render_id=render_id,
+            progress=95,
         )
 
     # ------------------------------------------------------------------
@@ -306,7 +360,8 @@ class RenderService:
         if composition.timeline.soundtrack is not None:
             src = composition.timeline.soundtrack.src
             resolved_asset = await self._asset_service.resolve_asset(
-                src, workspace=workspace,
+                src,
+                workspace=workspace,
             )
             asset_map[src] = str(resolved_asset.local_path)
 
@@ -322,7 +377,8 @@ class RenderService:
 
         if isinstance(asset, (VideoAsset, ImageAsset, AudioAsset)):
             resolved = await self._asset_service.resolve_asset(
-                asset.src, workspace=workspace,
+                asset.src,
+                workspace=workspace,
             )
             return asset.src, str(resolved.local_path)
 
@@ -370,7 +426,9 @@ class RenderService:
                 encoding="utf-8",
             )
             await render_crud.update_render_paths(
-                session, render_id, log_path=str(log_path),
+                session,
+                render_id,
+                log_path=str(log_path),
             )
 
         try:
@@ -386,5 +444,6 @@ class RenderService:
                 )
         except Exception:
             await logger.aerror(
-                "failed_to_mark_render_as_failed", render_id=render_id,
+                "failed_to_mark_render_as_failed",
+                render_id=render_id,
             )

@@ -559,12 +559,4 @@ class TestComposition:
 
     def test_missing_asset_field_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            Composition(
-                **{
-                    "timeline": {
-                        "tracks": [
-                            {"clips": [{"length": 3.0}]}
-                        ]
-                    }
-                }
-            )
+            Composition(**{"timeline": {"tracks": [{"clips": [{"length": 3.0}]}]}})

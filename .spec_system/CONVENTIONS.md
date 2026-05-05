@@ -160,9 +160,34 @@
 | Linter | ruff check | pyproject.toml |
 | Type Safety | mypy (strict) | pyproject.toml |
 | Testing | pytest + pytest-asyncio | pyproject.toml |
-| Observability | structlog | app/logging.py |
+| Observability | structlog | app/core/logging.py |
 | Git Hooks | pre-commit | .pre-commit-config.yaml |
 | Database | SQLModel + Alembic | alembic.ini |
+
+## CI/CD
+
+Platform: GitHub Actions
+
+| Bundle | Status | Workflow |
+|--------|--------|----------|
+| Code Quality | configured | .github/workflows/quality.yml |
+| Build & Test | not configured | - |
+| Security | not configured | - |
+| Integration | not configured | - |
+| Operations | not configured | - |
+
+## Infrastructure
+
+| Component | Provider | Details |
+|-----------|----------|---------|
+| Health | FastAPI /health | DB connectivity check, 30s Docker probe |
+| Hosting | Docker | Multi-stage build (Python + Node + FFmpeg) |
+| Database | SQLite (dev) / PostgreSQL (prod) | Async via SQLModel |
+| Local Dev | docker compose up | Port 8000, healthcheck configured |
+| WAF | not configured | - |
+| Rate Limit | not configured | - |
+| Backup | not configured | - |
+| Deploy | not configured | - |
 
 ## When In Doubt
 

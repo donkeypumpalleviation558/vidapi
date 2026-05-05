@@ -46,8 +46,7 @@ class RendererProtocol(Protocol):
     """Contract for all renderer backends."""
 
     @property
-    def name(self) -> str:
-        ...
+    def name(self) -> str: ...
 
     async def compile(
         self,
