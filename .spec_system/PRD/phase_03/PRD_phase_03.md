@@ -4,7 +4,7 @@
 **Sessions**: 5 (initial estimate)
 **Estimated Duration**: 10-20 days
 
-**Progress**: 3/5 sessions (60%)
+**Progress**: 4/5 sessions (80%)
 
 ---
 
@@ -20,7 +20,7 @@ Make VidAPI safe and operable outside local development by adding production dat
 |---------|------|--------|------------|-----------|
 | 01 | PostgreSQL Persistence and Alembic Migrations | Complete | ~20 | 2026-05-05 |
 | 02 | S3-compatible Storage and Download Modes | Complete | ~20 | 2026-05-05 |
-| 03 | API Key Authentication and Access Control | Not Started | ~18 | - |
+| 03 | API Key Authentication and Access Control | Complete | ~18 | 2026-05-05 |
 | 04 | Limits, Resource Controls, and Asset Security Hardening | Not Started | ~20 | - |
 | 05 | Operational Visibility and Production Stack | Not Started | ~20 | - |
 
@@ -30,12 +30,13 @@ Make VidAPI safe and operable outside local development by adding production dat
 
 - Session 01: PostgreSQL Persistence and Alembic Migrations (2026-05-05)
 - Session 02: S3-compatible Storage and Download Modes (2026-05-05)
+- Session 03: API Key Authentication and Access Control (2026-05-05)
 
 ---
 
 ## Upcoming Sessions
 
-- Session 03: API Key Authentication and Access Control
+- Session 04: Limits, Resource Controls, and Asset Security Hardening
 
 ---
 
@@ -94,7 +95,7 @@ Phase complete when:
 - [ ] All 5 sessions completed
 - [ ] VidAPI can run against PostgreSQL with Alembic-managed schema
 - [ ] Render artifacts can be stored in S3-compatible storage and returned through configured URL modes
-- [ ] Non-health API routes require API key authentication when enabled
+- [x] Non-health API routes require API key authentication when enabled
 - [ ] Request, asset, render, queue, and subprocess limits are enforced by tests
 - [ ] Operators can inspect render jobs, webhook attempts, logs, metrics, and deployment health
 - [ ] Docker Compose can run API, worker, Redis, Postgres, and MinIO together

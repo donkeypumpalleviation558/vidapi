@@ -79,6 +79,36 @@ If `DATABASE_AUTO_CREATE=false`, startup verifies database connectivity and the
 Alembic head revision. If migrations are missing or stale, startup fails with an
 actionable error instead of mutating the schema.
 
+## API Key Authentication
+
+Health endpoints remain public for load balancers and probes:
+
+- `GET /health`
+- `GET /v1/health`
+
+All render and template endpoints require `X-API-Key` when authentication is
+enabled:
+
+```bash
+export VIDAPI_API_KEY="replace-with-a-production-secret"
+export API_KEY_AUTH_ENABLED=true
+export API_KEY_HASHES="$(python -c 'import hashlib, os; print(hashlib.sha256(os.environ["VIDAPI_API_KEY"].encode()).hexdigest())')"
+
+curl -H "X-API-Key: $VIDAPI_API_KEY" https://api.example.com/v1/renders
+```
+
+Production startup enforces:
+
+```bash
+ENVIRONMENT=production
+API_KEY_AUTH_ENABLED=true
+API_KEY_HASHES=<sha256-hex-digest>[,<sha256-hex-digest>]
+```
+
+Do not store raw API keys in `.env`, Docker Compose files, deployment manifests,
+or logs. Store only SHA-256 hashes in VidAPI settings and keep the raw keys in a
+secret manager for clients that need to call the API.
+
 ## CI/CD Pipeline
 
 ```
@@ -157,5 +187,4 @@ renderer subprocess failures increase.
 ## Production Deployment (Planned)
 
 Phase 03 will add:
-- API key authentication
 - Operational visibility and production stack wiring

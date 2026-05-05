@@ -18,6 +18,7 @@ from app.api.errors import StorageError
 from app.db import render_crud
 from app.db.template_models import TemplateVersion
 from app.models.errors import (
+    AUTH_ERROR_RESPONSES,
     CONFLICT_ERROR,
     NOT_FOUND_ERROR,
     QUEUE_UNAVAILABLE_ERROR,
@@ -72,7 +73,10 @@ def _build_version_response(version: TemplateVersion) -> TemplateVersionResponse
     "/templates",
     response_model=CreateTemplateResponse,
     status_code=status.HTTP_201_CREATED,
-    responses={422: VALIDATION_ERROR},
+    responses={
+        **AUTH_ERROR_RESPONSES,
+        422: VALIDATION_ERROR,
+    },
 )
 async def create_template(
     body: CreateTemplateRequest,
@@ -101,7 +105,10 @@ async def create_template(
 @router.get(
     "/templates",
     response_model=TemplateListResponse,
-    responses={422: VALIDATION_ERROR},
+    responses={
+        **AUTH_ERROR_RESPONSES,
+        422: VALIDATION_ERROR,
+    },
 )
 async def list_templates(
     session: DBSessionDep,
@@ -144,6 +151,7 @@ async def list_templates(
     "/templates/{template_id}",
     response_model=TemplateResponse,
     responses={
+        **AUTH_ERROR_RESPONSES,
         404: NOT_FOUND_ERROR,
         422: VALIDATION_ERROR,
     },
@@ -183,6 +191,7 @@ async def get_template(
     "/templates/{template_id}",
     response_model=TemplateResponse,
     responses={
+        **AUTH_ERROR_RESPONSES,
         404: NOT_FOUND_ERROR,
         409: CONFLICT_ERROR,
         422: VALIDATION_ERROR,
@@ -240,6 +249,7 @@ async def update_template(
     "/templates/{template_id}",
     status_code=status.HTTP_200_OK,
     responses={
+        **AUTH_ERROR_RESPONSES,
         404: NOT_FOUND_ERROR,
         409: CONFLICT_ERROR,
         422: VALIDATION_ERROR,
@@ -276,6 +286,7 @@ async def delete_template(
     response_model=TemplateRenderResponse,
     status_code=status.HTTP_202_ACCEPTED,
     responses={
+        **AUTH_ERROR_RESPONSES,
         404: NOT_FOUND_ERROR,
         409: CONFLICT_ERROR,
         422: VALIDATION_ERROR,

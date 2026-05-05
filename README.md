@@ -56,6 +56,18 @@ uvicorn app.main:app --reload
 curl http://localhost:8000/v1/health
 ```
 
+Local development starts with API key auth disabled. To exercise protected API
+behavior locally, generate a SHA-256 hash for a raw key and enable auth:
+
+```bash
+export VIDAPI_API_KEY="replace-with-a-local-secret"
+export API_KEY_AUTH_ENABLED=true
+export API_KEY_HASHES="$(python -c 'import hashlib, os; print(hashlib.sha256(os.environ["VIDAPI_API_KEY"].encode()).hexdigest())')"
+uvicorn app.main:app --reload
+
+curl -H "X-API-Key: $VIDAPI_API_KEY" http://localhost:8000/v1/renders
+```
+
 ## Prerequisites
 
 - Python 3.11+
@@ -97,6 +109,7 @@ curl http://localhost:8000/v1/health
 | `GET` | `/v1/renders/{id}` | Get render status, progress, and output URLs |
 | `DELETE` | `/v1/renders/{id}` | Cancel a queued or running render |
 | `GET` | `/v1/renders/{id}/download` | Download rendered output |
+| `GET` | `/v1/renders/{id}/poster` | Download or redirect to a render poster |
 
 ### Template Endpoints
 
@@ -110,6 +123,16 @@ curl http://localhost:8000/v1/health
 | `POST` | `/v1/templates/{id}/renders` | Render a template with merge variables |
 
 Interactive API docs at `http://localhost:8000/docs` (Swagger) or `/redoc`.
+
+### API Authentication
+
+`GET /health` and `GET /v1/health` are always public. When
+`API_KEY_AUTH_ENABLED=true`, all render and template endpoints require an
+`X-API-Key` header. Configure accepted keys as SHA-256 hex digests through
+`API_KEY_HASHES`; multiple hashes can be comma-separated.
+
+Production startup requires API key auth to be enabled and at least one hash to
+be configured. Raw API keys are never configured in VidAPI settings.
 
 ## Documentation
 

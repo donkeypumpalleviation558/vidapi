@@ -74,3 +74,15 @@ CONFLICT_ERROR = documented_error(
     "Request conflicts with current resource state.",
     DetailErrorResponse,
 )
+AUTHENTICATION_ERROR = documented_error(
+    "API key credentials are missing.",
+    ErrorResponse,
+)
+AUTHORIZATION_ERROR = documented_error(
+    "API key credentials are invalid.",
+    ErrorResponse,
+)
+AUTH_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
+    401: AUTHENTICATION_ERROR,
+    403: AUTHORIZATION_ERROR,
+}

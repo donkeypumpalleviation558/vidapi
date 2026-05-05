@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import json
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal, Self
+from typing import Annotated, Any, Literal, Self
 from urllib.parse import urlsplit
 
-from pydantic import Field, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.exc import ArgumentError
+
+from app.core.security import normalize_configured_api_key_hashes
 
 SQLITE_DRIVER_NAMES = frozenset({"sqlite", "sqlite+aiosqlite"})
 POSTGRESQL_DRIVER_NAMES = frozenset(
@@ -95,6 +98,9 @@ class Settings(BaseSettings):
 
     redis_url: str = "redis://localhost:6379"
     render_mode: Literal["sync", "async"] = "sync"
+
+    api_key_auth_enabled: bool = False
+    api_key_hashes: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
     storage_root: Path = Path("data")
     render_workspace_root: Path = Path("data/renders")
@@ -197,6 +203,23 @@ class Settings(BaseSettings):
     webhook_max_retries: int = 3
     webhook_retry_delays: list[int] = [1, 10, 60]
 
+    @field_validator("api_key_hashes", mode="before")
+    @classmethod
+    def _parse_api_key_hashes(cls, value: Any) -> Any:
+        if value is None or value == "":
+            return []
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return []
+            if stripped.startswith("["):
+                try:
+                    return json.loads(stripped)
+                except json.JSONDecodeError:
+                    return value
+            return [part.strip() for part in stripped.split(",")]
+        return value
+
     @property
     def normalized_database_url(self) -> str:
         return normalize_database_url(self.database_url)
@@ -228,6 +251,24 @@ class Settings(BaseSettings):
                 raise ValueError(msg)
             if self.database_auto_create:
                 msg = "DATABASE_AUTO_CREATE must be false when ENVIRONMENT=production"
+                raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def _validate_api_key_auth_settings(self) -> Self:
+        normalized_hashes = normalize_configured_api_key_hashes(self.api_key_hashes)
+        self.api_key_hashes = list(normalized_hashes)
+
+        if self.api_key_auth_enabled and not self.api_key_hashes:
+            msg = "API_KEY_AUTH_ENABLED=true requires API_KEY_HASHES"
+            raise ValueError(msg)
+
+        if self.environment == "production":
+            if not self.api_key_auth_enabled:
+                msg = "ENVIRONMENT=production requires API_KEY_AUTH_ENABLED=true"
+                raise ValueError(msg)
+            if not self.api_key_hashes:
+                msg = "ENVIRONMENT=production requires API_KEY_HASHES"
                 raise ValueError(msg)
         return self
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from app.core.config import Settings, normalize_database_url, reset_settings_cache
+from app.core.security import hash_api_key
 from app.db.session import (
     DatabaseConfigurationError,
     create_database_engine,
@@ -11,6 +12,8 @@ from app.db.session import (
     dispose_engine,
     set_engine,
 )
+
+VALID_API_KEY_HASH = hash_api_key("vidapi-database-test-key")
 
 
 def test_default_database_url_uses_sqlite_aiosqlite() -> None:
@@ -93,6 +96,8 @@ def test_valid_production_database_settings() -> None:
         environment="production",
         database_url="postgresql+asyncpg://vidapi:secret@localhost/vidapi",
         database_auto_create=False,
+        api_key_auth_enabled=True,
+        api_key_hashes=[VALID_API_KEY_HASH],
     )
 
     assert settings.environment == "production"

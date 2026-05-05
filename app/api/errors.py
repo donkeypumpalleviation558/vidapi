@@ -61,6 +61,18 @@ class NotFoundError(VidAPIError):
     detail = "Resource not found."
 
 
+class MissingAPIKeyError(VidAPIError):
+    error_code = "AUTHENTICATION_REQUIRED"
+    status_code = 401
+    detail = "Missing API key."
+
+
+class InvalidAPIKeyError(VidAPIError):
+    error_code = "INVALID_API_KEY"
+    status_code = 403
+    detail = "Invalid API key."
+
+
 async def vidapi_error_handler(request: Request, exc: VidAPIError) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,

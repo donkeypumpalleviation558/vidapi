@@ -53,7 +53,8 @@
     "phase02-session04-transitions-and-positioning",
     "phase02-session05-audio-polish-and-hardening",
     "phase03-session01-postgresql-persistence-and-alembic-migrations",
-    "phase03-session02-s3-compatible-storage-and-download-modes"
+    "phase03-session02-s3-compatible-storage-and-download-modes",
+    "phase03-session03-api-key-authentication-and-access-control"
   ],
   "next_session_history": [
     {
@@ -299,6 +300,21 @@
     {
       "date": "2026-05-05",
       "session": "phase03-session02-s3-compatible-storage-and-download-modes",
+      "status": "completed"
+    },
+    {
+      "date": "2026-05-05",
+      "session": "phase03-session03-api-key-authentication-and-access-control",
+      "status": "planned"
+    },
+    {
+      "date": "2026-05-05",
+      "session": "phase03-session03-api-key-authentication-and-access-control",
+      "status": "validated"
+    },
+    {
+      "date": "2026-05-05",
+      "session": "phase03-session03-api-key-authentication-and-access-control",
       "status": "completed"
     }
   ]

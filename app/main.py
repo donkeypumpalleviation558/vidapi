@@ -6,10 +6,11 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import structlog
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
+from app.api.auth import require_api_key
 from app.api.errors import register_error_handlers
 from app.api.routes_health import router as health_router
 from app.api.routes_renders import router as renders_router
@@ -112,8 +113,17 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(health_router, prefix="/v1")
-    app.include_router(renders_router, prefix="/v1")
-    app.include_router(templates_router, prefix="/v1")
+    protected_dependencies = [Security(require_api_key)]
+    app.include_router(
+        renders_router,
+        prefix="/v1",
+        dependencies=protected_dependencies,
+    )
+    app.include_router(
+        templates_router,
+        prefix="/v1",
+        dependencies=protected_dependencies,
+    )
 
     return app
 

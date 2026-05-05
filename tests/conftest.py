@@ -23,6 +23,7 @@ from app.api.deps import (
     get_template_service,
 )
 from app.core.config import Settings, get_settings, reset_settings_cache
+from app.core.security import hash_api_key
 from app.db.session import get_session, set_engine
 from app.main import create_app
 from app.renderers.base import CompiledRender, RenderArtifact
@@ -35,6 +36,8 @@ from app.storage.local import LocalStorage
 from app.storage.urls import StorageUrlResolver
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
+AUTH_TEST_API_KEY = "vidapi-test-key"
+AUTH_TEST_API_KEY_HASH = hash_api_key(AUTH_TEST_API_KEY)
 
 
 @pytest.fixture(autouse=True)
@@ -61,6 +64,19 @@ def reset_app_settings_cache() -> Iterator[None]:
 @pytest.fixture
 def settings() -> Settings:
     return get_settings()
+
+
+@pytest.fixture
+def auth_settings() -> Settings:
+    return Settings(
+        api_key_auth_enabled=True,
+        api_key_hashes=[AUTH_TEST_API_KEY_HASH],
+    )
+
+
+@pytest.fixture
+def auth_headers() -> dict[str, str]:
+    return {"X-API-Key": AUTH_TEST_API_KEY}
 
 
 @pytest.fixture
@@ -195,6 +211,40 @@ async def client(
         async with SQLModelAsyncSession(db_engine) as session:
             yield session
 
+    app.dependency_overrides[get_session] = _override_session
+    app.dependency_overrides[get_local_storage] = lambda: test_storage
+    app.dependency_overrides[get_storage_backend] = lambda: test_storage
+    app.dependency_overrides[get_storage_url_resolver] = lambda: test_url_resolver
+    app.dependency_overrides[get_asset_service] = lambda: mock_asset_service
+    app.dependency_overrides[get_editly_renderer] = lambda: mock_renderer
+    app.dependency_overrides[get_render_service] = lambda: render_service
+    app.dependency_overrides[get_arq_pool_dep] = lambda: None
+    app.dependency_overrides[get_template_service] = lambda: TemplateService()
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def auth_client(
+    auth_settings,
+    db_engine,
+    test_storage,
+    test_url_resolver,
+    mock_asset_service,
+    mock_renderer,
+    render_service,
+) -> AsyncIterator[AsyncClient]:
+    app = create_app()
+
+    async def _override_session():
+        async with SQLModelAsyncSession(db_engine) as session:
+            yield session
+
+    app.dependency_overrides[get_settings] = lambda: auth_settings
     app.dependency_overrides[get_session] = _override_session
     app.dependency_overrides[get_local_storage] = lambda: test_storage
     app.dependency_overrides[get_storage_backend] = lambda: test_storage

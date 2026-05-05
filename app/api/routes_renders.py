@@ -18,6 +18,7 @@ from app.api.errors import StorageError
 from app.db import render_crud
 from app.models.composition import Composition
 from app.models.errors import (
+    AUTH_ERROR_RESPONSES,
     CONFLICT_ERROR,
     NOT_FOUND_ERROR,
     QUEUE_UNAVAILABLE_ERROR,
@@ -47,6 +48,7 @@ router = APIRouter(tags=["renders"])
     response_model=CreateRenderResponse,
     status_code=status.HTTP_202_ACCEPTED,
     responses={
+        **AUTH_ERROR_RESPONSES,
         422: VALIDATION_ERROR,
         429: RATE_LIMIT_ERROR,
         503: QUEUE_UNAVAILABLE_ERROR,
@@ -160,7 +162,10 @@ async def _create_render_sync(
 @router.get(
     "/renders",
     response_model=RenderListResponse,
-    responses={422: VALIDATION_ERROR},
+    responses={
+        **AUTH_ERROR_RESPONSES,
+        422: VALIDATION_ERROR,
+    },
 )
 async def list_renders(
     session: DBSessionDep,
@@ -217,6 +222,7 @@ async def list_renders(
     "/renders/{render_id}",
     status_code=status.HTTP_200_OK,
     responses={
+        **AUTH_ERROR_RESPONSES,
         404: NOT_FOUND_ERROR,
         409: CONFLICT_ERROR,
         422: VALIDATION_ERROR,
@@ -276,6 +282,7 @@ async def cancel_render(
     "/renders/{render_id}",
     response_model=RenderResponse,
     responses={
+        **AUTH_ERROR_RESPONSES,
         404: NOT_FOUND_ERROR,
         422: VALIDATION_ERROR,
     },
@@ -324,6 +331,7 @@ async def get_render(
 @router.get(
     "/renders/{render_id}/download",
     responses={
+        **AUTH_ERROR_RESPONSES,
         404: NOT_FOUND_ERROR,
         422: VALIDATION_ERROR,
     },
@@ -371,6 +379,7 @@ async def download_render(
 @router.get(
     "/renders/{render_id}/poster",
     responses={
+        **AUTH_ERROR_RESPONSES,
         404: NOT_FOUND_ERROR,
         422: VALIDATION_ERROR,
     },
