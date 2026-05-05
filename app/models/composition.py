@@ -106,6 +106,18 @@ class TransitionType(StrEnum):
     FADE_IN = "fade_in"
     FADE_OUT = "fade_out"
     CROSSFADE = "crossfade"
+    DIRECTIONAL_LEFT = "directional_left"
+    DIRECTIONAL_RIGHT = "directional_right"
+    DIRECTIONAL_UP = "directional_up"
+    DIRECTIONAL_DOWN = "directional_down"
+    WIPE_LEFT = "wipe_left"
+    WIPE_RIGHT = "wipe_right"
+    WIPE_UP = "wipe_up"
+    WIPE_DOWN = "wipe_down"
+    CROSS_ZOOM = "cross_zoom"
+    SIMPLE_ZOOM = "simple_zoom"
+    CIRCLE_OPEN = "circle_open"
+    LINEAR_BLUR = "linear_blur"
 
 
 class TransitionPlacement(StrEnum):
@@ -118,6 +130,47 @@ TRANSITION_PLACEMENTS: dict[TransitionType, TransitionPlacement] = {
     TransitionType.FADE_IN: TransitionPlacement.IN,
     TransitionType.FADE_OUT: TransitionPlacement.OUT,
     TransitionType.CROSSFADE: TransitionPlacement.BETWEEN,
+    TransitionType.DIRECTIONAL_LEFT: TransitionPlacement.BETWEEN,
+    TransitionType.DIRECTIONAL_RIGHT: TransitionPlacement.BETWEEN,
+    TransitionType.DIRECTIONAL_UP: TransitionPlacement.BETWEEN,
+    TransitionType.DIRECTIONAL_DOWN: TransitionPlacement.BETWEEN,
+    TransitionType.WIPE_LEFT: TransitionPlacement.BETWEEN,
+    TransitionType.WIPE_RIGHT: TransitionPlacement.BETWEEN,
+    TransitionType.WIPE_UP: TransitionPlacement.BETWEEN,
+    TransitionType.WIPE_DOWN: TransitionPlacement.BETWEEN,
+    TransitionType.CROSS_ZOOM: TransitionPlacement.BETWEEN,
+    TransitionType.SIMPLE_ZOOM: TransitionPlacement.BETWEEN,
+    TransitionType.CIRCLE_OPEN: TransitionPlacement.BETWEEN,
+    TransitionType.LINEAR_BLUR: TransitionPlacement.BETWEEN,
+}
+
+BETWEEN_TRANSITION_TYPES: frozenset[TransitionType] = frozenset(
+    transition
+    for transition, placement in TRANSITION_PLACEMENTS.items()
+    if placement is TransitionPlacement.BETWEEN
+)
+
+TRANSITION_ALIASES: dict[str, TransitionType] = {
+    "fadeIn": TransitionType.FADE_IN,
+    "fade-in": TransitionType.FADE_IN,
+    "fadeOut": TransitionType.FADE_OUT,
+    "fade-out": TransitionType.FADE_OUT,
+    "directional-left": TransitionType.DIRECTIONAL_LEFT,
+    "directional-right": TransitionType.DIRECTIONAL_RIGHT,
+    "directional-up": TransitionType.DIRECTIONAL_UP,
+    "directional-down": TransitionType.DIRECTIONAL_DOWN,
+    "wipe-left": TransitionType.WIPE_LEFT,
+    "wipe-right": TransitionType.WIPE_RIGHT,
+    "wipe-up": TransitionType.WIPE_UP,
+    "wipe-down": TransitionType.WIPE_DOWN,
+    "crosszoom": TransitionType.CROSS_ZOOM,
+    "cross-zoom": TransitionType.CROSS_ZOOM,
+    "simplezoom": TransitionType.SIMPLE_ZOOM,
+    "simple-zoom": TransitionType.SIMPLE_ZOOM,
+    "circleopen": TransitionType.CIRCLE_OPEN,
+    "circle-open": TransitionType.CIRCLE_OPEN,
+    "linearblur": TransitionType.LINEAR_BLUR,
+    "linear-blur": TransitionType.LINEAR_BLUR,
 }
 
 
@@ -271,13 +324,7 @@ class Transition(BaseModel):
     @classmethod
     def _parse_transition_type(cls, v: object) -> object:
         if isinstance(v, str):
-            aliases = {
-                "fadeIn": TransitionType.FADE_IN,
-                "fade-in": TransitionType.FADE_IN,
-                "fadeOut": TransitionType.FADE_OUT,
-                "fade-out": TransitionType.FADE_OUT,
-            }
-            return aliases.get(v, v)
+            return TRANSITION_ALIASES.get(v, v)
         return v
 
     @model_validator(mode="after")

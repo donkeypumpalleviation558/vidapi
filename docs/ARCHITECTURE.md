@@ -41,7 +41,7 @@ Render Worker (ARQ consumer)
   |   |   |-- Editly Renderer (Node subprocess)
   |   |   |   |-- Segment Compiler (timeline -> sequential clips)
   |   |   |   |-- Position Resolver (named positions + offsets)
-  |   |   |   |-- Transition Compiler (fade and crossfade boundaries)
+  |   |   |   |-- Transition Planner (schema values -> validated renderer boundaries)
   |   |   |   |-- FFmpeg (invoked by Editly)
   |   |   |
   |   |   |-- Audio Mixer (FFmpeg post-process for detached audio)
@@ -124,9 +124,9 @@ Local Filesystem (render artifacts)
 - **Location**: `app/renderers/position.py`
 
 ### Transition Compiler
-- **Purpose**: Emits Editly-compatible fade and crossfade transitions at segment boundaries
-- **Tech**: Renderer-facing transition mapping with composition validation
-- **Location**: `app/renderers/editly.py`
+- **Purpose**: Validates public transition semantics and emits Editly-compatible transitions at segment boundaries
+- **Tech**: Pure planner, renderer-facing mapping, shared limit validation, bounded errors
+- **Location**: `app/renderers/transitions.py`, `app/renderers/editly.py`
 
 ### Audio Mixer
 - **Purpose**: Post-processes rendered video to mix detached audio clips with correct timing
@@ -192,26 +192,27 @@ Local Filesystem (render artifacts)
 1. Client POSTs JSON composition to `/v1/renders`
 2. Pydantic validates the composition schema
 3. Renderer capability validation selects `editly` for omitted, `auto`, or explicit `editly` requests
-4. Render record created in SQLite with status `queued` and selected renderer metadata
-5. Input JSON persisted to workspace; job enqueued to Redis via ARQ
-6. API returns 202 Accepted with render ID immediately
-7. Worker picks up job and revalidates stored renderer capabilities before workspace creation
-8. Worker creates isolated workspace and drives pipeline: fetching -> compiling -> rendering -> uploading
-9. Assets resolved: remote fetched via httpx, text rendered to PNG, all cached by SHA-256
-10. Template-backed renders expand merge variables before compile and persist `expanded.json`
-11. Render service revalidates renderer capabilities before compilation as a replay defense
-12. Segment compiler converts absolute-time timeline to sequential Editly clips
-13. Position resolver and transition compiler normalize renderer-facing layout details
-14. Compiled Editly JSON + replay metadata written to workspace
-15. Editly invoked as Node subprocess with timeout; progress parsed from FFmpeg stderr
-16. Detached audio clips mixed via FFmpeg post-processing when needed
-17. Caption finisher writes sidecars or burns captions into the MP4 intermediate when requested
-18. Output postprocessor keeps MP4 or converts the selected intermediate to WebM, GIF, or a PNG sequence zip and manifest
-19. Poster extraction uses request-level default, timestamp, percent, or disabled behavior
-20. Artifacts and caption, output, and poster metadata persist to storage and database
-21. Render status updated to `succeeded` or `failed`
-22. Webhook delivery is queued for terminal states when configured
-23. Client polls GET `/v1/renders/{id}` for status, progress, artifact metadata, and download URLs
+4. Shared composition limits validate duration, output, captions, posters, and transition semantics
+5. Render record created in SQLite with status `queued` and selected renderer metadata
+6. Input JSON persisted to workspace; job enqueued to Redis via ARQ
+7. API returns 202 Accepted with render ID immediately
+8. Worker picks up job and revalidates stored renderer capabilities before workspace creation
+9. Worker creates isolated workspace and drives pipeline: fetching -> compiling -> rendering -> uploading
+10. Assets resolved: remote fetched via httpx, text rendered to PNG, all cached by SHA-256
+11. Template-backed renders expand merge variables before compile and persist `expanded.json`
+12. Render service revalidates renderer capabilities and transition semantics before compilation as a replay defense
+13. Segment compiler converts absolute-time timeline to sequential Editly clips
+14. Position resolver and transition planner normalize renderer-facing layout details
+15. Compiled Editly JSON + replay metadata written to workspace
+16. Editly invoked as Node subprocess with timeout; progress parsed from FFmpeg stderr
+17. Detached audio clips mixed via FFmpeg post-processing when needed
+18. Caption finisher writes sidecars or burns captions into the MP4 intermediate when requested
+19. Output postprocessor keeps MP4 or converts the selected intermediate to WebM, GIF, or a PNG sequence zip and manifest
+20. Poster extraction uses request-level default, timestamp, percent, or disabled behavior
+21. Artifacts and caption, output, and poster metadata persist to storage and database
+22. Render status updated to `succeeded` or `failed`
+23. Webhook delivery is queued for terminal states when configured
+24. Client polls GET `/v1/renders/{id}` for status, progress, artifact metadata, and download URLs
 
 ### Cancellation Flow
 
@@ -258,6 +259,7 @@ Same pipeline stages run synchronously within the API request when `RENDER_MODE=
 | Two-pass audio mixing | FFmpeg post-process | Editly audioTracks lacks per-track timing; -c:v copy avoids re-encoding |
 | MP4 intermediate for non-MP4 outputs | FFmpeg finishing step | Keeps Editly as the default renderer while enabling WebM, GIF, and PNG sequence artifacts |
 | Caption finishing before output conversion | Shared intermediate step | Burned captions propagate to all requested output formats without renderer-specific public schemas |
+| Public transition allowlist | Explicit enum values | Keeps Editly transition names and params behind the compiler boundary |
 | Workspace isolation per job | Separate WorkspaceManager | Single responsibility, concurrent safety |
 | Xvfb in worker container | Virtual framebuffer | Editly's gl module needs an OpenGL context |
 | Template renders pin version at submission | Stored active version pointer | Reproducible template renders and stable audit trail |

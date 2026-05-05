@@ -24,8 +24,8 @@
 | Setup | 3 | 3 | 0 |
 | Foundation | 6 | 6 | 0 |
 | Implementation | 10 | 10 | 0 |
-| Testing | 5 | 1 | 4 |
-| **Total** | **24** | **20** | **4** |
+| Testing | 5 | 5 | 0 |
+| **Total** | **24** | **24** | **0** |
 
 ---
 
@@ -74,10 +74,10 @@ Main feature implementation.
 Verification and quality assurance.
 
 - [x] T020 [S0403] [P] Write composition schema tests for caption timing, style bounds, mode parsing, poster options, and explicit validation failures (`tests/test_composition_schema.py`)
-- [ ] T021 [S0403] [P] Write caption formatting tests for cue ordering, newline handling, SRT/WebVTT/ASS escaping, and deterministic sidecar bytes (`tests/test_caption_formats.py`)
-- [ ] T022 [S0403] [P] Write caption finishing and poster option tests for FFmpeg command construction, timeout handling, bounded diagnostics, and disabled poster mode (`tests/test_caption_finishing.py`)
-- [ ] T023 [S0403] Update API, worker, storage URL, webhook, and migration integration tests for caption/poster metadata, sidecar downloads, and failure cleanup (`tests/test_worker_pipeline.py`)
-- [ ] T024 [S0403] Run targeted tests, ruff, mypy where feasible, and ASCII validation on all session artifacts (`tests/test_caption_finishing.py`)
+- [x] T021 [S0403] [P] Write caption formatting tests for cue ordering, newline handling, SRT/WebVTT/ASS escaping, and deterministic sidecar bytes (`tests/test_caption_formats.py`)
+- [x] T022 [S0403] [P] Write caption finishing and poster option tests for FFmpeg command construction, timeout handling, bounded diagnostics, and disabled poster mode (`tests/test_caption_finishing.py`)
+- [x] T023 [S0403] Update API, worker, storage URL, webhook, and migration integration tests for caption/poster metadata, sidecar downloads, and failure cleanup (`tests/test_worker_pipeline.py`)
+- [x] T024 [S0403] Run targeted tests, ruff, mypy where feasible, and ASCII validation on all session artifacts (`tests/test_caption_finishing.py`)
 
 ---
 
@@ -85,14 +85,14 @@ Verification and quality assurance.
 
 Before marking session complete:
 
-- [ ] All tasks marked `[x]`
-- [ ] All tests passing
-- [ ] All files ASCII-encoded
-- [ ] implementation-notes.md updated
-- [ ] Ready for the validate workflow step
+- [x] All tasks marked `[x]`
+- [x] All tests passing
+- [x] All files ASCII-encoded
+- [x] implementation-notes.md updated
+- [x] Ready for the validate workflow step
 
 ---
 
 ## Next Steps
 
-Run the implement workflow step to begin AI-led implementation.
+Run the validate workflow step to verify session completeness.

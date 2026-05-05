@@ -53,6 +53,9 @@ def test_proxy_mode_returns_relative_download_and_poster_urls(tmp_path: Path) ->
     assert resolver.proxy_url("render_abc123", ArtifactType.POSTER) == (
         "/v1/renders/render_abc123/poster"
     )
+    assert resolver.proxy_url("render_abc123", ArtifactType.CAPTION_SIDECAR) == (
+        "/v1/renders/render_abc123/captions"
+    )
 
 
 @pytest.mark.asyncio
@@ -173,6 +176,91 @@ async def test_output_metadata_includes_manifest_url_in_proxy_mode(
 
     assert metadata is not None
     assert metadata.manifest_url == "/v1/renders/render_abc123/artifacts/manifest.json"
+
+
+@pytest.mark.asyncio
+async def test_caption_and_poster_metadata_include_proxy_urls(
+    tmp_path: Path,
+) -> None:
+    storage = LocalStorage(workspace_root=tmp_path)
+    resolver = StorageUrlResolver(
+        storage=storage,
+        url_mode=StorageUrlMode.PROXY,
+        signed_url_expiry_seconds=900,
+    )
+    render = _render(
+        caption_mode="sidecar",
+        caption_format="srt",
+        caption_sidecar_path="/tmp/captions.srt",
+        caption_sidecar_media_type="application/x-subrip",
+        caption_sidecar_filename="render_abc123-captions.srt",
+        caption_cue_count=2,
+        caption_burned_in=False,
+        poster_mode="timestamp",
+        poster_timestamp_seconds=1.25,
+        poster_media_type="image/jpeg",
+        poster_filename="render_abc123.jpg",
+    )
+
+    captions = await resolver.caption_metadata(render)
+    poster = await resolver.poster_metadata(render)
+
+    assert captions is not None
+    assert captions.sidecar_url == "/v1/renders/render_abc123/captions"
+    assert captions.filename == "render_abc123-captions.srt"
+    assert poster is not None
+    assert poster.url == "/v1/renders/render_abc123/poster"
+    assert poster.timestamp_seconds == 1.25
+
+
+@pytest.mark.asyncio
+async def test_signed_mode_resolves_caption_sidecar_metadata_url() -> None:
+    storage = FakeS3Storage("https://signed.example/captions.srt?sig=abc")
+    resolver = StorageUrlResolver(
+        storage=storage,  # type: ignore[arg-type]
+        url_mode=StorageUrlMode.SIGNED,
+        signed_url_expiry_seconds=300,
+    )
+    render = _render(
+        caption_mode="sidecar",
+        caption_format="srt",
+        caption_sidecar_path="s3://vidapi-renders/renders/render_abc123/captions.srt",
+        caption_sidecar_media_type="application/x-subrip",
+        caption_sidecar_filename="render_abc123-captions.srt",
+        caption_cue_count=1,
+        caption_burned_in=False,
+    )
+
+    captions = await resolver.caption_metadata(render)
+
+    assert captions is not None
+    assert captions.sidecar_url == "https://signed.example/captions.srt?sig=abc"
+    assert storage.presign_calls == [
+        ("s3://vidapi-renders/renders/render_abc123/captions.srt", 300)
+    ]
+
+
+@pytest.mark.asyncio
+async def test_public_mode_resolves_poster_metadata_url() -> None:
+    storage = FakeS3Storage("unused")
+    resolver = StorageUrlResolver(
+        storage=storage,  # type: ignore[arg-type]
+        url_mode=StorageUrlMode.PUBLIC,
+        signed_url_expiry_seconds=900,
+        public_base_url="https://cdn.example.com/base",
+    )
+    render = _render(
+        poster_path="s3://vidapi-renders/renders/render_abc123/poster.jpg",
+        poster_mode="default",
+        poster_timestamp_seconds=0.5,
+        poster_media_type="image/jpeg",
+        poster_filename="render_abc123.jpg",
+    )
+
+    poster = await resolver.poster_metadata(render)
+
+    assert poster is not None
+    assert poster.url == "https://cdn.example.com/base/renders/render_abc123/poster.jpg"
 
 
 @pytest.mark.asyncio

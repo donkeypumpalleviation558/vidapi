@@ -164,6 +164,46 @@ with bounded context. See
 [Renderer Capabilities](docs/renderer-capabilities.md) for the support matrix
 and extension contract.
 
+### Transitions
+
+Clip transitions are declared in VidAPI's renderer-neutral composition schema.
+Supported values include `fade_in`, `fade_out`, `crossfade`,
+`directional_left`, `directional_right`, `directional_up`, `directional_down`,
+`wipe_left`, `wipe_right`, `wipe_up`, `wipe_down`, `cross_zoom`,
+`simple_zoom`, `circle_open`, and `linear_blur`.
+
+`between` transitions are declared on the outgoing clip and require an exact
+same-track successor. Gaps, overlaps, overlong durations, audio-only clips, and
+multiple transitions at one rendered boundary are rejected before the job is
+queued or compiled.
+
+```json
+{
+  "timeline": {
+    "tracks": [
+      {
+        "clips": [
+          {
+            "asset": {"type": "video", "src": "intro.mp4"},
+            "start": 0,
+            "length": 2,
+            "transition": {"name": "wipe_left", "duration": 0.4}
+          },
+          {
+            "asset": {"type": "video", "src": "main.mp4"},
+            "start": 2,
+            "length": 3
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+See [Transitions](docs/transitions.md) for aliases, placement rules, timing
+constraints, and renderer support notes.
+
 ### Output Formats And Presets
 
 `output.format` supports `mp4`, `webm`, `gif`, and `png-sequence`. Editly
@@ -247,6 +287,7 @@ and a `Retry-After` header.
 - [Development Guide](docs/development.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Renderer Capabilities](docs/renderer-capabilities.md)
+- [Transitions](docs/transitions.md)
 - [Output Formats](docs/output-formats.md)
 - [Captions and Posters](docs/captions-and-posters.md)
 - [Deployment](docs/deployment.md)

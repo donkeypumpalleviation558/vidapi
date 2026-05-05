@@ -14,9 +14,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
 from app.core.config import Settings
 from app.db import render_crud
 from app.db.session import set_engine
+from app.models.composition import CaptionFormat, CaptionMode, Composition, PosterMode
 from app.models.error_codes import ErrorCode
+from app.models.output_artifacts import StoredCaptionMetadata, StoredPosterMetadata
 from app.models.render import RenderStatus
 from app.renderers.base import CompiledRender
+from app.services.caption_finishing import CaptionFinishingError
 from app.services.render_service import RenderService, RenderServiceError
 from app.storage.base import ArtifactType
 from app.workers.render_worker import run_render
@@ -378,6 +381,164 @@ class TestPipelineFailures:
             assert render is not None
             assert render.status == RenderStatus.FAILED.value
             assert render.error_code == ErrorCode.WORKER_UNEXPECTED_ERROR.value
+
+
+class TestRenderStageCaptionPosterMetadata:
+    @pytest.mark.asyncio
+    async def test_render_stage_persists_caption_sidecar_and_disabled_poster_metadata(
+        self,
+        db_session,
+        test_storage,
+        render_service,
+    ) -> None:
+        render = await render_crud.create_render(db_session)
+        render_id = render.id
+        workspace = await test_storage.create_workspace(render_id)
+        compiled = CompiledRender(
+            spec_path=workspace / "compiled.editly.json",
+            replay_path=workspace / "replay.json",
+            workspace=workspace,
+            renderer_name="editly",
+            spec_json="{}",
+        )
+        composition = Composition.model_validate(
+            {
+                "timeline": {
+                    "tracks": [
+                        {
+                            "clips": [
+                                {
+                                    "asset": {"type": "color", "color": "#000000"},
+                                    "length": 1.0,
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "output": {"format": "mp4", "poster": {"mode": "disabled"}},
+                "captions": {
+                    "mode": "sidecar",
+                    "format": "srt",
+                    "cues": [
+                        {"start": 0.0, "end": 1.0, "text": "Hello"},
+                    ],
+                },
+            }
+        )
+
+        await render_service.stage_render_and_store(
+            composition,
+            compiled,
+            render_id,
+            workspace,
+            db_session,
+        )
+
+        stored = await render_crud.get_render_by_id(db_session, render_id)
+        assert stored is not None
+        assert stored.output_path is not None
+        assert stored.caption_mode == CaptionMode.SIDECAR.value
+        assert stored.caption_format == CaptionFormat.SRT.value
+        assert stored.caption_sidecar_path is not None
+        assert stored.caption_sidecar_filename == f"{render_id}-captions.srt"
+        assert stored.caption_cue_count == 1
+        assert stored.caption_burned_in is False
+        assert stored.poster_path is None
+        assert stored.poster_mode == PosterMode.DISABLED.value
+
+        sidecar_bytes = await test_storage.read_uri(stored.caption_sidecar_path)
+        assert sidecar_bytes.startswith(b"1\n00:00:00,000")
+
+    @pytest.mark.asyncio
+    async def test_caption_failure_clears_stale_caption_and_poster_metadata(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        db_session,
+        test_storage,
+        render_service,
+    ) -> None:
+        render = await render_crud.create_render(db_session)
+        render_id = render.id
+        workspace = await test_storage.create_workspace(render_id)
+        await render_crud.update_render_caption_metadata(
+            db_session,
+            render_id,
+            metadata=StoredCaptionMetadata(
+                mode=CaptionMode.SIDECAR,
+                format=CaptionFormat.SRT,
+                sidecar_media_type="application/x-subrip",
+                sidecar_filename="stale.srt",
+                cue_count=1,
+                burned_in=False,
+            ),
+            sidecar_path="/tmp/stale.srt",
+        )
+        await render_crud.update_render_poster_metadata(
+            db_session,
+            render_id,
+            metadata=StoredPosterMetadata(
+                mode=PosterMode.DEFAULT,
+                timestamp_seconds=0.25,
+                media_type="image/jpeg",
+                filename="stale.jpg",
+            ),
+            poster_path="/tmp/stale.jpg",
+        )
+        compiled = CompiledRender(
+            spec_path=workspace / "compiled.editly.json",
+            replay_path=workspace / "replay.json",
+            workspace=workspace,
+            renderer_name="editly",
+            spec_json="{}",
+        )
+        composition = Composition.model_validate(
+            {
+                "timeline": {
+                    "tracks": [
+                        {
+                            "clips": [
+                                {
+                                    "asset": {"type": "color", "color": "#000000"},
+                                    "length": 1.0,
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "captions": {
+                    "mode": "sidecar",
+                    "format": "srt",
+                    "cues": [
+                        {"start": 0.0, "end": 1.0, "text": "Hello"},
+                    ],
+                },
+            }
+        )
+
+        async def _fail_caption_finish(**kwargs: object) -> None:
+            raise CaptionFinishingError("caption failed")
+
+        monkeypatch.setattr(
+            render_service._caption_finisher,
+            "finish",
+            _fail_caption_finish,
+        )
+
+        with pytest.raises(RenderServiceError):
+            await render_service.stage_render_and_store(
+                composition,
+                compiled,
+                render_id,
+                workspace,
+                db_session,
+            )
+
+        stored = await render_crud.get_render_by_id(db_session, render_id)
+        assert stored is not None
+        assert stored.caption_mode is None
+        assert stored.caption_sidecar_path is None
+        assert stored.poster_mode is None
+        assert stored.poster_path is None
 
     @pytest.mark.asyncio
     async def test_missing_render_returns_early(

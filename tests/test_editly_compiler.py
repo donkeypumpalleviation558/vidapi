@@ -413,6 +413,44 @@ class TestAssembleEditlySpec:
         assert len(spec["clips"]) == 2
         assert spec["clips"][0]["transition"] == {"name": "fade", "duration": 0.25}
 
+    def test_advanced_transition_maps_to_deterministic_editly_name(self):
+        comp = Composition(
+            timeline=Timeline(
+                tracks=[
+                    Track(
+                        clips=[
+                            Clip(
+                                asset=VideoAsset(type="video", src="/a.mp4"),
+                                start=0.0,
+                                length=2.0,
+                                transition={
+                                    "name": "directional_left",
+                                    "duration": 0.25,
+                                },
+                            ),
+                            Clip(
+                                asset=VideoAsset(type="video", src="/b.mp4"),
+                                start=2.0,
+                                length=2.0,
+                            ),
+                        ]
+                    ),
+                ],
+            ),
+            output=Output(width=1280, height=720, fps=30),
+        )
+        tracks = comp.timeline.tracks
+        total_dur = compute_total_duration(tracks)
+        boundaries = collect_boundaries(tracks, total_dur)
+        segments = generate_segments(boundaries, tracks)
+
+        spec = assemble_editly_spec(segments, comp, "/out.mp4")
+
+        assert spec["clips"][0]["transition"] == {
+            "name": "directional-left",
+            "duration": 0.25,
+        }
+
     def test_fixture_defaults_omit_new_visual_and_transition_keys(self):
         fixture_path = Path("tests/fixtures/sample_composition.json")
         comp = Composition.model_validate_json(fixture_path.read_text())

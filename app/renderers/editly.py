@@ -24,8 +24,6 @@ from app.models.composition import (
     NamedPosition,
     TextAsset,
     Track,
-    Transition,
-    TransitionType,
     VideoAsset,
 )
 from app.renderers.base import (
@@ -35,6 +33,12 @@ from app.renderers.base import (
     RenderError,
 )
 from app.renderers.position import resolve_position
+from app.renderers.transitions import (
+    TransitionValidationError,
+    editly_transition_payload,
+    plan_transition_effects,
+    transition_plan_by_boundary,
+)
 from app.services.audio_mixer import AudioMixError, AudioMixPlan, AudioSource, mix_audio
 
 logger = structlog.get_logger(__name__)
@@ -533,65 +537,6 @@ def map_soundtrack(soundtrack: AudioAsset | None) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-def _map_transition_to_editly(transition: Transition) -> dict[str, Any]:
-    return {
-        "name": "fade",
-        "duration": round(transition.duration, 6),
-    }
-
-
-def _find_transition_at_boundary(
-    segment: Segment,
-    next_segment: Segment | None,
-) -> Transition | None:
-    boundary = segment.end
-    candidates: list[tuple[int, int, Transition]] = []
-
-    if next_segment is not None:
-        for active_clip in segment.active_clips:
-            clip = active_clip.clip
-            if (
-                clip.transition is None
-                or clip.transition.name != TransitionType.CROSSFADE
-            ):
-                continue
-            if abs((clip.start + clip.length) - boundary) >= EPSILON:
-                continue
-
-            has_sequential_clip = any(
-                next_active_clip.track_index == active_clip.track_index
-                and next_active_clip.clip is not clip
-                and abs(next_active_clip.clip.start - boundary) < EPSILON
-                for next_active_clip in next_segment.active_clips
-            )
-            if has_sequential_clip:
-                candidates.append((2, active_clip.track_index, clip.transition))
-
-    for active_clip in segment.active_clips:
-        clip = active_clip.clip
-        if clip.transition is None or clip.transition.name != TransitionType.FADE_OUT:
-            continue
-        if abs((clip.start + clip.length) - boundary) < EPSILON:
-            candidates.append((1, active_clip.track_index, clip.transition))
-
-    if next_segment is not None:
-        for active_clip in next_segment.active_clips:
-            clip = active_clip.clip
-            if (
-                clip.transition is None
-                or clip.transition.name != TransitionType.FADE_IN
-            ):
-                continue
-            if abs(clip.start - boundary) < EPSILON:
-                candidates.append((0, active_clip.track_index, clip.transition))
-
-    if not candidates:
-        return None
-
-    candidates.sort(key=lambda candidate: (candidate[0], candidate[1]), reverse=True)
-    return candidates[0][2]
-
-
 def assemble_editly_spec(
     segments: list[Segment],
     composition: Composition,
@@ -608,10 +553,14 @@ def assemble_editly_spec(
     clips: list[dict[str, Any]] = []
     output_width = composition.output.width or 1920
     output_height = composition.output.height or 1080
+    try:
+        transition_plans = transition_plan_by_boundary(
+            plan_transition_effects(composition)
+        )
+    except TransitionValidationError as exc:
+        raise CompileError(str(exc)) from exc
 
-    for index, segment in enumerate(segments):
-        next_segment = segments[index + 1] if index + 1 < len(segments) else None
-
+    for segment in segments:
         if not segment.active_clips:
             layers: list[dict[str, Any]] = [
                 {"type": "fill-color", "color": composition.timeline.background}
@@ -642,9 +591,11 @@ def assemble_editly_spec(
             "duration": round(segment.duration, 6),
             "layers": layers,
         }
-        transition = _find_transition_at_boundary(segment, next_segment)
-        if transition is not None:
-            clip_spec["transition"] = _map_transition_to_editly(transition)
+        transition_plan = transition_plans.get(round(segment.end, 6))
+        if transition_plan is not None:
+            clip_spec["transition"] = editly_transition_payload(
+                transition_plan.transition
+            )
 
         clips.append(clip_spec)
 

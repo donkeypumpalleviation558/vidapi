@@ -1,4 +1,7 @@
 from app.models.composition import (
+    BETWEEN_TRANSITION_TYPES,
+    TRANSITION_ALIASES,
+    TRANSITION_PLACEMENTS,
     AspectRatio,
     Asset,
     AudioAsset,
@@ -32,6 +35,9 @@ from app.models.render import (
 )
 
 __all__ = [
+    "BETWEEN_TRANSITION_TYPES",
+    "TRANSITION_ALIASES",
+    "TRANSITION_PLACEMENTS",
     "AspectRatio",
     "Asset",
     "AudioAsset",

@@ -23,6 +23,19 @@ EXPECTED_TABLES = {
     "template_versions",
     "webhook_attempts",
 }
+EXPECTED_RENDER_METADATA_COLUMNS = {
+    "caption_mode",
+    "caption_format",
+    "caption_sidecar_path",
+    "caption_sidecar_media_type",
+    "caption_sidecar_filename",
+    "caption_cue_count",
+    "caption_burned_in",
+    "poster_mode",
+    "poster_timestamp_seconds",
+    "poster_media_type",
+    "poster_filename",
+}
 
 
 def _alembic_script() -> ScriptDirectory:
@@ -51,6 +64,12 @@ def _sqlite_alembic_version(database_path: Path) -> str:
     return str(row[0])
 
 
+def _sqlite_columns(database_path: Path, table_name: str) -> set[str]:
+    with sqlite3.connect(database_path) as conn:
+        rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    return {str(row[1]) for row in rows}
+
+
 def _has_postgresql_smoke_url() -> bool:
     try:
         return is_postgresql_database_url(os.environ.get("DATABASE_URL", "sqlite://"))
@@ -64,19 +83,25 @@ def test_sqlmodel_metadata_includes_current_database_tables() -> None:
     assert EXPECTED_TABLES.issubset(table_names)
 
 
+def test_sqlmodel_render_metadata_includes_caption_and_poster_columns() -> None:
+    render_columns = set(SQLModel.metadata.tables["renders"].columns.keys())
+
+    assert EXPECTED_RENDER_METADATA_COLUMNS.issubset(render_columns)
+
+
 def test_alembic_has_single_current_head() -> None:
     heads = _alembic_script().get_heads()
 
-    assert heads == ["006"]
+    assert heads == ["007"]
 
 
-def test_alembic_revision_chain_includes_webhook_revision() -> None:
+def test_alembic_revision_chain_includes_caption_and_poster_revision() -> None:
     revisions = {
         revision.revision
         for revision in _alembic_script().walk_revisions(base="base", head="heads")
     }
 
-    assert {"001", "002", "003", "004", "005", "006"}.issubset(revisions)
+    assert {"001", "002", "003", "004", "005", "006", "007"}.issubset(revisions)
 
 
 def test_alembic_upgrades_and_downgrades_sqlite_database(
@@ -91,7 +116,10 @@ def test_alembic_upgrades_and_downgrades_sqlite_database(
         command.upgrade(_alembic_config(), "head")
 
         assert EXPECTED_TABLES.issubset(_sqlite_tables(database_path))
-        assert _sqlite_alembic_version(database_path) == "006"
+        assert _sqlite_alembic_version(database_path) == "007"
+        assert EXPECTED_RENDER_METADATA_COLUMNS.issubset(
+            _sqlite_columns(database_path, "renders")
+        )
 
         command.downgrade(_alembic_config(), "base")
 

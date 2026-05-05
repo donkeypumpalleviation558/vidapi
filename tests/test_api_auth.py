@@ -63,6 +63,7 @@ PROTECTED_REQUESTS = [
     ("delete", "/v1/renders/render_missing", None),
     ("get", "/v1/renders/render_missing/download", None),
     ("get", "/v1/renders/render_missing/poster", None),
+    ("get", "/v1/renders/render_missing/captions", None),
     ("get", "/v1/templates", None),
     ("post", "/v1/templates", "template"),
     ("post", "/v1/templates/tmpl_missing/renders", "template_render"),
@@ -249,6 +250,7 @@ async def test_download_and_poster_require_auth_before_artifact_lookup(
     for path in (
         "/v1/renders/render_does_not_exist/download",
         "/v1/renders/render_does_not_exist/poster",
+        "/v1/renders/render_does_not_exist/captions",
     ):
         missing_key_response = await auth_client.get(path)
         invalid_key_response = await auth_client.get(

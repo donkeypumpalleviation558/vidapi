@@ -12,6 +12,7 @@ from app.models.composition import (
     PosterMode,
     TransitionType,
 )
+from app.renderers.transitions import EDITLY_SUPPORTED_TRANSITIONS
 from app.services.output_formats import supported_output_formats
 
 AUTO_RENDERER = "auto"
@@ -151,13 +152,7 @@ EDITLY_CAPABILITY = RendererCapability(
     available=True,
     asset_types=frozenset({"video", "image", "text", "audio", "color"}),
     output_formats=supported_output_formats(),
-    transitions=frozenset(
-        {
-            TransitionType.FADE_IN,
-            TransitionType.FADE_OUT,
-            TransitionType.CROSSFADE,
-        }
-    ),
+    transitions=EDITLY_SUPPORTED_TRANSITIONS,
     supports_captions=True,
     supports_poster_options=True,
 )

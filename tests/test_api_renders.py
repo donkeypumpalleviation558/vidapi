@@ -11,8 +11,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
 from app.api.deps import get_session, get_storage_backend, get_storage_url_resolver
 from app.db import render_crud
 from app.main import create_app
-from app.models.composition import OutputFormat
-from app.models.output_artifacts import StoredOutputMetadata
+from app.models.composition import CaptionFormat, CaptionMode, OutputFormat, PosterMode
+from app.models.output_artifacts import (
+    StoredCaptionMetadata,
+    StoredOutputMetadata,
+    StoredPosterMetadata,
+)
 from app.models.render import RenderStatus
 from app.services.merge import MergeError, expand_merge_variables
 from app.storage.base import ArtifactType, StorageBackend, StorageUrlMode
@@ -182,6 +186,69 @@ class TestPostRenders:
         assert body["error"]["code"] == "COMPOSITION_LIMIT_EXCEEDED"
         assert body["error"]["context"]["field"] == "output.png_sequence.fps"
 
+    @pytest.mark.asyncio
+    async def test_valid_advanced_transition_returns_202(
+        self,
+        client: AsyncClient,
+        sample_composition: dict,
+    ):
+        payload = deepcopy(sample_composition)
+        payload["timeline"]["tracks"] = [
+            {
+                "clips": [
+                    {
+                        "asset": {"type": "image", "src": "https://example.com/a.png"},
+                        "start": 0.0,
+                        "length": 1.0,
+                        "transition": {"name": "wipe_left", "duration": 0.25},
+                    },
+                    {
+                        "asset": {"type": "image", "src": "https://example.com/b.png"},
+                        "start": 1.0,
+                        "length": 1.0,
+                    },
+                ]
+            }
+        ]
+
+        response = await client.post("/v1/renders", json=payload)
+
+        assert response.status_code == 202
+
+    @pytest.mark.asyncio
+    async def test_invalid_advanced_transition_timing_returns_422(
+        self,
+        client: AsyncClient,
+        sample_composition: dict,
+    ):
+        payload = deepcopy(sample_composition)
+        payload["timeline"]["tracks"] = [
+            {
+                "clips": [
+                    {
+                        "asset": {"type": "image", "src": "https://example.com/a.png"},
+                        "start": 0.0,
+                        "length": 2.0,
+                        "transition": {"name": "cross_zoom", "duration": 1.5},
+                    },
+                    {
+                        "asset": {"type": "image", "src": "https://example.com/b.png"},
+                        "start": 2.0,
+                        "length": 1.0,
+                    },
+                ]
+            }
+        ]
+
+        response = await client.post("/v1/renders", json=payload)
+
+        assert response.status_code == 422
+        body = response.json()
+        assert body["error"]["code"] == "COMPOSITION_LIMIT_EXCEEDED"
+        assert body["error"]["context"]["field"] == (
+            "timeline.tracks[0].clips[0].transition.duration"
+        )
+
 
 # ---------------------------------------------------------------------------
 # GET /v1/renders/{id} contract tests
@@ -258,6 +325,89 @@ class TestGetRender:
         assert output["format"] == "webm"
         assert output["media_type"] == "video/webm"
         assert output["filename"] == f"{render_id}.webm"
+
+    @pytest.mark.asyncio
+    async def test_succeeded_render_has_caption_and_poster_metadata(
+        self,
+        client: AsyncClient,
+        db_session,
+        test_storage,
+    ):
+        render = await render_crud.create_render(db_session)
+        render_id = render.id
+        output_uri = await test_storage.publish_bytes(
+            render_id,
+            ArtifactType.OUTPUT,
+            b"video-bytes",
+        )
+        sidecar_uri = await test_storage.publish_bytes(
+            render_id,
+            ArtifactType.CAPTION_SIDECAR,
+            b"caption-bytes",
+            suffix=".srt",
+            media_type="application/x-subrip",
+        )
+        poster_uri = await test_storage.publish_bytes(
+            render_id,
+            ArtifactType.POSTER,
+            b"poster-bytes",
+        )
+        await render_crud.update_render_output_metadata(
+            db_session,
+            render_id,
+            metadata=StoredOutputMetadata(
+                format=OutputFormat.MP4,
+                media_type="video/mp4",
+                filename=f"{render_id}.mp4",
+            ),
+            output_path=output_uri,
+        )
+        await render_crud.update_render_caption_metadata(
+            db_session,
+            render_id,
+            metadata=StoredCaptionMetadata(
+                mode=CaptionMode.SIDECAR,
+                format=CaptionFormat.SRT,
+                sidecar_media_type="application/x-subrip",
+                sidecar_filename=f"{render_id}-captions.srt",
+                cue_count=2,
+                burned_in=False,
+            ),
+            sidecar_path=sidecar_uri,
+        )
+        await render_crud.update_render_poster_metadata(
+            db_session,
+            render_id,
+            metadata=StoredPosterMetadata(
+                mode=PosterMode.TIMESTAMP,
+                timestamp_seconds=1.25,
+                media_type="image/jpeg",
+                filename=f"{render_id}.jpg",
+            ),
+            poster_path=poster_uri,
+        )
+        await _mark_render_succeeded(db_session, render_id)
+
+        response = await client.get(f"/v1/renders/{render_id}")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["captions"] == {
+            "mode": "sidecar",
+            "format": "srt",
+            "cue_count": 2,
+            "burned_in": False,
+            "sidecar_url": f"/v1/renders/{render_id}/captions",
+            "media_type": "application/x-subrip",
+            "filename": f"{render_id}-captions.srt",
+        }
+        assert body["poster_metadata"] == {
+            "mode": "timestamp",
+            "timestamp_seconds": 1.25,
+            "url": f"/v1/renders/{render_id}/poster",
+            "media_type": "image/jpeg",
+            "filename": f"{render_id}.jpg",
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -436,6 +586,47 @@ class TestDownloadRender:
         response = await client.get(f"/v1/renders/{render_id}/download")
 
         assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_caption_sidecar_endpoint_streams_storage_artifact(
+        self,
+        client: AsyncClient,
+        db_session,
+        test_storage,
+    ):
+        render = await render_crud.create_render(db_session)
+        render_id = render.id
+        sidecar_uri = await test_storage.publish_bytes(
+            render_id,
+            ArtifactType.CAPTION_SIDECAR,
+            b"1\n00:00:00,000 --> 00:00:01,000\nHello\n",
+            suffix=".srt",
+            media_type="application/x-subrip",
+        )
+        await render_crud.update_render_caption_metadata(
+            db_session,
+            render_id,
+            metadata=StoredCaptionMetadata(
+                mode=CaptionMode.SIDECAR,
+                format=CaptionFormat.SRT,
+                sidecar_media_type="application/x-subrip",
+                sidecar_filename=f"{render_id}-captions.srt",
+                cue_count=1,
+                burned_in=False,
+            ),
+            sidecar_path=sidecar_uri,
+        )
+        await _mark_render_succeeded(db_session, render_id)
+
+        response = await client.get(f"/v1/renders/{render_id}/captions")
+
+        assert response.status_code == 200
+        assert response.content.startswith(b"1\n00:00:00,000")
+        assert response.headers["content-type"].startswith("application/x-subrip")
+        assert (
+            f'filename="{render_id}-captions.srt"'
+            in response.headers["content-disposition"]
+        )
 
     @pytest.mark.asyncio
     async def test_signed_download_endpoint_redirects(

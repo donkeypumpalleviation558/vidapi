@@ -6,7 +6,11 @@ from app.models.composition import Composition
 from app.renderers.capabilities import (
     DEFAULT_RENDERER,
     EDITLY_CAPABILITY,
+    EDITLY_RENDERER,
+    RENDERER_CAPABILITIES,
+    RendererCapability,
     UnsupportedRendererError,
+    UnsupportedRendererFeatureError,
     available_renderer_names,
     known_renderer_names,
     select_renderer,
@@ -87,6 +91,22 @@ def test_validate_renderer_capabilities_accepts_supported_editly_composition() -
     assert selection.renderer == "editly"
 
 
+def test_editly_capability_declares_advanced_transitions() -> None:
+    requested = {
+        "crossfade",
+        "directional_left",
+        "wipe_left",
+        "cross_zoom",
+        "simple_zoom",
+        "circle_open",
+        "linear_blur",
+    }
+
+    assert requested.issubset(
+        {transition.value for transition in EDITLY_CAPABILITY.transitions}
+    )
+
+
 @pytest.mark.parametrize("output_format", ["mp4", "webm", "gif", "png-sequence"])
 def test_validate_renderer_capabilities_accepts_implemented_output_formats(
     output_format: str,
@@ -111,5 +131,55 @@ def test_capability_error_context_does_not_include_asset_or_callback_urls() -> N
         validate_renderer_capabilities(composition)
 
     context_text = repr(exc_info.value.to_context())
+    assert "example.com" not in context_text
+    assert "secret" not in context_text
+
+
+def test_unsupported_transition_context_is_bounded_and_redacted(monkeypatch) -> None:
+    limited_capability = RendererCapability(
+        name=EDITLY_RENDERER,
+        available=True,
+        asset_types=EDITLY_CAPABILITY.asset_types,
+        output_formats=EDITLY_CAPABILITY.output_formats,
+        transitions=frozenset(),
+        supports_captions=EDITLY_CAPABILITY.supports_captions,
+        supports_poster_options=EDITLY_CAPABILITY.supports_poster_options,
+    )
+    monkeypatch.setitem(RENDERER_CAPABILITIES, EDITLY_RENDERER, limited_capability)
+    composition = _composition(
+        callback="https://callback.example.com/hook?token=secret",
+        timeline={
+            "tracks": [
+                {
+                    "clips": [
+                        {
+                            "asset": {
+                                "type": "image",
+                                "src": "https://example.com/image.png?secret=token",
+                            },
+                            "length": 1.0,
+                            "transition": {"name": "wipe_left", "duration": 0.2},
+                        },
+                        {
+                            "asset": {
+                                "type": "image",
+                                "src": "https://example.com/b.png",
+                            },
+                            "start": 1.0,
+                            "length": 1.0,
+                        },
+                    ]
+                }
+            ]
+        },
+    )
+
+    with pytest.raises(UnsupportedRendererFeatureError) as exc_info:
+        validate_renderer_capabilities(composition)
+
+    context = exc_info.value.to_context()
+    assert context["feature"] == "timeline.tracks[0].clips[0].transition.name"
+    assert context["requested"] == "wipe_left"
+    context_text = repr(context)
     assert "example.com" not in context_text
     assert "secret" not in context_text

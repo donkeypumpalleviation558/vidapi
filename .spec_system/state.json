@@ -3,7 +3,7 @@
   "project_name": "VidAPI",
   "description": "Self-hosted Python FastAPI service that replicates Creatomate/JSON2Video behavior - accepts JSON timeline compositions and renders video via FFmpeg",
   "current_phase": 4,
-  "current_session": "phase04-session03-captions-and-poster-customization",
+  "current_session": null,
   "monorepo": false,
   "phases": {
     "0": {
@@ -59,7 +59,9 @@
     "phase03-session04-limits-resource-controls-and-asset-security-hardening",
     "phase03-session05-operational-visibility-and-production-stack",
     "phase04-session01-renderer-capability-registry",
-    "phase04-session02-output-formats-and-presets"
+    "phase04-session02-output-formats-and-presets",
+    "phase04-session03-captions-and-poster-customization",
+    "phase04-session04-advanced-transitions-and-feature-validation"
   ],
   "next_session_history": [
     {
@@ -381,6 +383,31 @@
       "date": "2026-05-05",
       "session": "phase04-session03-captions-and-poster-customization",
       "status": "planned"
+    },
+    {
+      "date": "2026-05-05",
+      "session": "phase04-session03-captions-and-poster-customization",
+      "status": "validated"
+    },
+    {
+      "date": "2026-05-05",
+      "session": "phase04-session03-captions-and-poster-customization",
+      "status": "completed"
+    },
+    {
+      "date": "2026-05-05",
+      "session": "phase04-session04-advanced-transitions-and-feature-validation",
+      "status": "planned"
+    },
+    {
+      "date": "2026-05-05",
+      "session": "phase04-session04-advanced-transitions-and-feature-validation",
+      "status": "validated"
+    },
+    {
+      "date": "2026-05-05",
+      "session": "phase04-session04-advanced-transitions-and-feature-validation",
+      "status": "completed"
     }
   ]
 }

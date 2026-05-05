@@ -26,7 +26,7 @@ VidAPI error envelope.
 |---------|------------------|
 | Asset types | `video`, `image`, `text`, `audio`, `color` |
 | Output formats | `mp4`, `webm`, `gif`, `png-sequence` |
-| Transitions | `fade_in`, `fade_out`, `crossfade` |
+| Transitions | `fade_in`, `fade_out`, `crossfade`, `directional_left`, `directional_right`, `directional_up`, `directional_down`, `wipe_left`, `wipe_right`, `wipe_up`, `wipe_down`, `cross_zoom`, `simple_zoom`, `circle_open`, `linear_blur` |
 | Captions | `sidecar`, `burn-in` |
 | Caption sidecar formats | `srt`, `webvtt` |
 | Poster controls | `default`, `timestamp`, `percent`, `disabled` |
@@ -47,9 +47,9 @@ Renderer capability failures use the standard VidAPI managed error envelope:
     "message": "Renderer does not support requested feature.",
     "context": {
       "renderer": "editly",
-      "renderer": "hyperframes",
-      "reason": "unavailable",
-      "available_renderers": ["editly"]
+      "feature": "timeline.tracks[0].clips[0].transition.name",
+      "requested": "wipe_left",
+      "supported": ["fade_in"]
     }
   }
 }
@@ -60,6 +60,13 @@ paths, and enum-like requested values, but it must not include raw composition
 payloads, asset URLs, callback URLs, storage paths, renderer specs, stack
 traces, or secrets.
 
+Transition capability validation is intentionally separate from transition
+semantic validation. A renderer can declare that it supports `wipe_left`, while
+the shared transition validator still rejects a specific request if that
+transition has no exact same-track successor, overlaps another clip, exceeds
+incoming clip duration, or competes with another transition at the same rendered
+boundary.
+
 ## Extension Points
 
 Future adapters should add or update one capability record in
@@ -67,3 +74,6 @@ Future adapters should add or update one capability record in
 existing renderer protocol. Route handlers and workers should continue to call
 the shared selection and validation helpers rather than adding renderer-specific
 branches.
+
+Renderer adapters should map VidAPI transition enum values internally instead
+of accepting renderer-native transition names or parameter objects from clients.

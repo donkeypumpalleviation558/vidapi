@@ -2,7 +2,7 @@
 
 **Session ID**: `phase04-session03-captions-and-poster-customization`
 **Started**: 2026-05-05 14:31
-**Last Updated**: 2026-05-05 14:48
+**Last Updated**: 2026-05-05 15:41
 
 ---
 
@@ -10,8 +10,8 @@
 
 | Metric | Value |
 |--------|-------|
-| Tasks Completed | 20 / 24 |
-| Estimated Remaining | 3-4 hours |
+| Tasks Completed | 24 / 24 |
+| Estimated Remaining | 0 hours |
 | Blockers | 0 |
 
 ---
@@ -503,5 +503,126 @@
 **BQC Fixes**:
 - Trust boundary enforcement: tests cover invalid user-provided caption and
   poster fields before render work begins.
+
+---
+
+### Task T021 - Write caption formatting tests
+
+**Started**: 2026-05-05 15:31
+**Completed**: 2026-05-05 15:33
+**Duration**: 2 minutes
+
+**Notes**:
+- Added tests for deterministic cue planning, SRT/WebVTT serialization,
+  ASS burn-in serialization, sidecar filenames, sidecar bytes, and path-like
+  render ID rejection.
+- Ran targeted caption format tests: 7 passed.
+
+**Files Changed**:
+- `tests/test_caption_formats.py` - added caption formatting and escaping tests.
+
+**BQC Fixes**:
+- Contract alignment: tests pin sidecar media types, filenames, and byte output.
+- Trust boundary enforcement: tests cover escaping and unsafe render ID rejection.
+
+---
+
+### Task T022 - Write caption finishing and poster option tests
+
+**Started**: 2026-05-05 15:33
+**Completed**: 2026-05-05 15:35
+**Duration**: 2 minutes
+
+**Notes**:
+- Added tests for FFmpeg caption burn-in command construction, sidecar writes,
+  burn-in artifact output, timeout termination, bounded stderr diagnostics, and
+  disabled poster mode behavior.
+- Ran targeted caption finishing tests: 7 passed.
+
+**Files Changed**:
+- `tests/test_caption_finishing.py` - added caption finishing and poster option
+  tests.
+
+**BQC Fixes**:
+- External dependency resilience: tests pin timeout and bounded stderr handling.
+- Resource cleanup: tests verify timed-out FFmpeg processes are terminated.
+- Duplicate action prevention: disabled poster tests assert no subprocess is
+  launched when poster generation is explicitly disabled.
+
+---
+
+### Task T023 - Update integration coverage
+
+**Started**: 2026-05-05 15:35
+**Completed**: 2026-05-05 15:38
+**Duration**: 3 minutes
+
+**Notes**:
+- Added API status and sidecar download coverage for caption and poster
+  metadata.
+- Added auth protection coverage for the caption sidecar endpoint.
+- Added storage URL coverage for caption and poster metadata across proxy,
+  signed, and public modes.
+- Added webhook payload coverage for caption and poster metadata through shared
+  URL resolution.
+- Updated Alembic tests to revision `007` and added render metadata column
+  checks.
+- Added render-stage integration coverage for caption sidecar persistence,
+  disabled poster metadata, and stale metadata cleanup on caption failure.
+- Ran affected integration suites: 114 passed, 1 skipped.
+
+**Files Changed**:
+- `tests/test_api_renders.py` - added status metadata and sidecar download
+  tests.
+- `tests/test_api_auth.py` - added caption endpoint auth coverage.
+- `tests/test_storage_urls.py` - added caption/poster metadata URL mode tests.
+- `tests/test_webhook_service.py` - added caption/poster webhook metadata tests.
+- `tests/test_worker_pipeline.py` - added render-stage metadata persistence and
+  cleanup tests.
+- `tests/test_alembic_migrations.py` - updated migration head and metadata
+  column checks.
+
+**BQC Fixes**:
+- Trust boundary enforcement: tests verify auth runs before caption artifact
+  lookup.
+- State freshness on re-entry: render-stage tests verify stale metadata is
+  cleared before failed caption finishing leaves the stage.
+- Contract alignment: status, storage URL, webhook, and migration tests now
+  agree on caption/poster metadata shapes.
+
+---
+
+### Task T024 - Run verification and ASCII validation
+
+**Started**: 2026-05-05 15:38
+**Completed**: 2026-05-05 15:41
+**Duration**: 3 minutes
+
+**Notes**:
+- Ran targeted session test suite: 218 passed, 1 skipped.
+- Applied `ruff format` to two touched test files, then reran affected tests:
+  36 passed.
+- Ran `uv run ruff check .`: passed.
+- Ran `uv run ruff format --check .`: passed.
+- Ran `uv run mypy app`: passed.
+- Ran `uv run mypy tests/test_caption_formats.py tests/test_caption_finishing.py`:
+  passed.
+- Ran ASCII and LF scan across all changed session files: passed.
+- Created the session implementation summary artifact.
+- `uv run mypy .` remains blocked by optional packages in `references/`;
+  `uv run mypy app tests` remains blocked by pre-existing untyped legacy tests.
+
+**Files Changed**:
+- `.spec_system/specs/phase04-session03-captions-and-poster-customization/IMPLEMENTATION_SUMMARY.md` - added final session summary and verification record.
+- `.spec_system/specs/phase04-session03-captions-and-poster-customization/tasks.md` - marked final task and completion checklist complete.
+- `.spec_system/specs/phase04-session03-captions-and-poster-customization/implementation-notes.md` - added final verification log.
+- `tests/test_api_renders.py` - formatted by `ruff format`.
+- `tests/test_caption_formats.py` - formatted by `ruff format`.
+
+**BQC Fixes**:
+- Contract alignment: final verification covers API, worker, storage URL,
+  webhook, migration, caption formatting, and caption finishing paths.
+- Error information boundaries: bounded diagnostics tests and metadata response
+  tests passed.
 
 ---

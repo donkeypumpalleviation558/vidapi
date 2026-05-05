@@ -15,8 +15,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
 from app.core.config import Settings
 from app.db.models import Render
 from app.db.webhook_models import WebhookAttempt  # noqa: F401 - registers table
-from app.models.composition import OutputFormat
-from app.models.output_artifacts import RenderOutputMetadata
+from app.models.composition import CaptionFormat, CaptionMode, OutputFormat, PosterMode
+from app.models.output_artifacts import (
+    RenderCaptionMetadata,
+    RenderOutputMetadata,
+    RenderPosterMetadata,
+)
 from app.services.webhook_service import (
     build_headers,
     build_storage_aware_webhook_payload,
@@ -49,6 +53,34 @@ class FakeWebhookUrlResolver:
             manifest_url="https://cdn.example.com/manifest.json"
             if render.output_manifest_path
             else None,
+        )
+
+    async def caption_metadata(self, render: Render) -> RenderCaptionMetadata | None:
+        if not render.caption_mode:
+            return None
+        return RenderCaptionMetadata(
+            mode=CaptionMode(render.caption_mode),
+            format=CaptionFormat(render.caption_format)
+            if render.caption_format
+            else None,
+            cue_count=render.caption_cue_count or 0,
+            burned_in=bool(render.caption_burned_in),
+            sidecar_url="https://cdn.example.com/captions.srt"
+            if render.caption_sidecar_path
+            else None,
+            media_type=render.caption_sidecar_media_type,
+            filename=render.caption_sidecar_filename,
+        )
+
+    async def poster_metadata(self, render: Render) -> RenderPosterMetadata | None:
+        if not render.poster_mode:
+            return None
+        return RenderPosterMetadata(
+            mode=PosterMode(render.poster_mode),
+            timestamp_seconds=render.poster_timestamp_seconds,
+            url="https://cdn.example.com/poster.jpg" if render.poster_path else None,
+            media_type=render.poster_media_type,
+            filename=render.poster_filename,
         )
 
 
@@ -121,6 +153,40 @@ class TestBuildWebhookPayload:
             "manifest_url": None,
         }
 
+    def test_payload_includes_caption_and_poster_metadata(self) -> None:
+        render = _make_render(
+            caption_mode="sidecar",
+            caption_format="srt",
+            caption_sidecar_path="/data/renders/render_test123/captions.srt",
+            caption_sidecar_media_type="application/x-subrip",
+            caption_sidecar_filename="render_test123-captions.srt",
+            caption_cue_count=2,
+            caption_burned_in=False,
+            poster_mode="timestamp",
+            poster_timestamp_seconds=1.5,
+            poster_media_type="image/jpeg",
+            poster_filename="render_test123.jpg",
+        )
+
+        payload = build_webhook_payload(event="render.succeeded", render=render)
+
+        assert payload["captions"] == {
+            "mode": "sidecar",
+            "format": "srt",
+            "cue_count": 2,
+            "burned_in": False,
+            "sidecar_url": None,
+            "media_type": "application/x-subrip",
+            "filename": "render_test123-captions.srt",
+        }
+        assert payload["poster_metadata"] == {
+            "mode": "timestamp",
+            "timestamp_seconds": 1.5,
+            "url": "/v1/renders/render_test123/poster",
+            "media_type": "image/jpeg",
+            "filename": "render_test123.jpg",
+        }
+
     @pytest.mark.asyncio
     async def test_storage_aware_payload_uses_resolved_urls(self) -> None:
         render = _make_render()
@@ -155,6 +221,35 @@ class TestBuildWebhookPayload:
         assert payload["output"]["manifest_url"] == (
             "https://cdn.example.com/manifest.json"
         )
+
+    @pytest.mark.asyncio
+    async def test_storage_aware_payload_uses_resolved_caption_and_poster_metadata(
+        self,
+    ) -> None:
+        render = _make_render(
+            caption_mode="sidecar",
+            caption_format="srt",
+            caption_sidecar_path="/data/renders/render_test123/captions.srt",
+            caption_sidecar_media_type="application/x-subrip",
+            caption_sidecar_filename="render_test123-captions.srt",
+            caption_cue_count=1,
+            caption_burned_in=False,
+            poster_mode="default",
+            poster_timestamp_seconds=0.5,
+            poster_media_type="image/jpeg",
+            poster_filename="render_test123.jpg",
+        )
+
+        payload = await build_storage_aware_webhook_payload(
+            event="render.succeeded",
+            render=render,
+            url_resolver=FakeWebhookUrlResolver(),  # type: ignore[arg-type]
+        )
+
+        assert payload["captions"]["sidecar_url"] == (
+            "https://cdn.example.com/captions.srt"
+        )
+        assert payload["poster_metadata"]["url"] == "https://cdn.example.com/poster.jpg"
 
 
 # ---- T015: HMAC signing tests ----

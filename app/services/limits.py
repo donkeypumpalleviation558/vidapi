@@ -14,6 +14,7 @@ from app.models.composition import (
     TextAsset,
     VideoAsset,
 )
+from app.renderers.transitions import validate_transition_semantics
 from app.services.ffprobe import MediaInfo
 
 COMPOSITION_LIMIT_EXCEEDED = "COMPOSITION_LIMIT_EXCEEDED"
@@ -27,8 +28,8 @@ class LimitViolation:
     code: str
     message: str
     field: str
-    limit: int | float
-    observed: int | float
+    limit: int | float | str
+    observed: int | float | str
 
     def to_context(self) -> dict[str, int | float | str]:
         return {
@@ -138,6 +139,7 @@ def validate_composition_limits(
     validate_output_format_limits(composition, settings, stats=stats)
     validate_caption_limits(composition, settings, stats=stats)
     validate_poster_limits(composition, stats=stats)
+    validate_transition_limits(composition)
 
 
 def validate_output_format_limits(
@@ -261,6 +263,23 @@ def validate_poster_limits(
         observed=poster.timestamp or 0.0,
         limit=stats.duration_seconds,
         code=COMPOSITION_LIMIT_EXCEEDED,
+    )
+
+
+def validate_transition_limits(composition: Composition) -> None:
+    """Raise if transition timing or boundary semantics cannot be rendered."""
+    issues = validate_transition_semantics(composition)
+    if not issues:
+        return
+    first_issue = issues[0]
+    raise LimitExceededError(
+        LimitViolation(
+            code=COMPOSITION_LIMIT_EXCEEDED,
+            message=first_issue.message,
+            field=first_issue.field,
+            limit=first_issue.limit,
+            observed=first_issue.observed,
+        )
     )
 
 
