@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
+from sqlmodel import col, select
 
 from app.db.models import Render
 from app.models.render import RenderStatus
@@ -97,7 +97,7 @@ async def list_renders(
     count_result = await session.execute(count_stmt)
     total = count_result.scalar_one()
 
-    query = base.order_by(Render.created_at.desc()).offset(offset).limit(limit)
+    query = base.order_by(col(Render.created_at).desc()).offset(offset).limit(limit)
     result = await session.execute(query)
     items = list(result.scalars().all())
 

@@ -78,6 +78,10 @@ class Settings(BaseSettings):
 
     progress_update_interval_seconds: float = 2.0
 
+    rate_limit_default: str = "60/minute"
+    rate_limit_render_create: str = "10/minute"
+    rate_limit_storage_uri: str = "memory://"
+
     poster_enabled: bool = True
     poster_timestamp_percent: float = 0.25
     poster_format: str = "jpg"

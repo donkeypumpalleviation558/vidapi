@@ -180,7 +180,7 @@ async def list_renders(
 async def cancel_render(
     render_id: str,
     session: DBSessionDep,
-) -> dict:
+) -> dict[str, str]:
     """Cancel a render job.
 
     Queued renders transition immediately to CANCELLED.

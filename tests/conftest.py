@@ -17,6 +17,7 @@ from app.api.deps import (
     get_editly_renderer,
     get_local_storage,
     get_render_service,
+    get_template_service,
 )
 from app.core.config import Settings, get_settings
 from app.db.session import get_session, set_engine
@@ -25,6 +26,7 @@ from app.renderers.base import CompiledRender, RenderArtifact
 from app.renderers.editly import EditlyRenderer
 from app.services.asset_service import AssetService, ResolvedAsset
 from app.services.render_service import RenderService
+from app.services.template_service import TemplateService
 from app.storage.local import LocalStorage
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -157,6 +159,7 @@ async def client(
     app.dependency_overrides[get_editly_renderer] = lambda: mock_renderer
     app.dependency_overrides[get_render_service] = lambda: render_service
     app.dependency_overrides[get_arq_pool_dep] = lambda: None
+    app.dependency_overrides[get_template_service] = lambda: TemplateService()
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

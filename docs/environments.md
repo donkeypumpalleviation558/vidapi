@@ -2,26 +2,31 @@
 
 | Environment | URL | Purpose |
 |-------------|-----|---------|
-| Development | http://localhost:8000 | Local development |
-| Docker Dev | http://localhost:8000 | Docker Compose local stack |
+| Development (sync) | http://localhost:8000 | Local dev without Redis |
+| Development (async) | http://localhost:8000 | Local dev with Redis + worker |
+| Docker Dev | http://localhost:8000 | Docker Compose full stack |
 | Staging | TBD (Phase 03) | Pre-production testing |
 | Production | TBD (Phase 03) | Live system |
 
 ## Configuration Differences
 
-| Config | Dev (local) | Dev (Docker) | Production (planned) |
-|--------|-------------|--------------|----------------------|
-| Database | SQLite file | SQLite file | PostgreSQL |
-| Storage | Local filesystem | Local filesystem (volume) | S3-compatible |
-| Debug mode | true | true | false |
-| Log format | Console | Console | JSON |
-| Asset HTTP | Allowed | Allowed | HTTPS only |
-| Auth | None | None | API key required |
+| Config | Dev (sync) | Dev (async) | Docker Dev | Production (planned) |
+|--------|------------|-------------|------------|----------------------|
+| Render mode | sync | async | async | async |
+| Database | SQLite file | SQLite file | SQLite file | PostgreSQL |
+| Storage | Local filesystem | Local filesystem | Docker volume | S3-compatible |
+| Redis | Not used | localhost:6379 | redis:6379 (internal) | Redis cluster |
+| Debug mode | true | true | true | false |
+| Log format | Console | Console | Console | JSON |
+| Asset HTTP | Allowed | Allowed | Allowed | HTTPS only |
+| Auth | None | None | None | API key required |
 
 ## Required Environment Variables
 
 - `DATABASE_URL`: Database connection string (SQLite for dev, PostgreSQL for prod)
 - `STORAGE_ROOT`: Root directory for render artifacts and asset cache
+- `RENDER_MODE`: `sync` or `async` (determines whether Redis/ARQ is used)
+- `REDIS_URL`: Redis connection string (required when `RENDER_MODE=async`)
 - `DEBUG`: Enable debug mode and console log output
 - `LOG_LEVEL`: Logging verbosity (DEBUG, INFO, WARNING, ERROR)
 

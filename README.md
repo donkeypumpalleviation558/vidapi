@@ -77,7 +77,7 @@ curl http://localhost:8000/v1/health
 |   |-- storage/           # Storage protocol and local filesystem adapter
 |   \-- workers/           # Background job workers (Phase 01)
 |-- alembic/               # Database migrations
-|-- tests/                 # 226+ tests (schema, security, compiler, API)
+|-- tests/                 # 336+ tests (schema, security, compiler, API, worker)
 |-- docs/                  # Architecture, development, deployment guides
 |-- Dockerfile.api          # Slim API image (Python + FastAPI)
 |-- Dockerfile.worker       # Full worker image (Python + Node + FFmpeg)
@@ -90,9 +90,11 @@ curl http://localhost:8000/v1/health
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `GET` | `/v1/health` | Health check |
-| `POST` | `/v1/renders` | Create a render job |
-| `GET` | `/v1/renders/{id}` | Get render status |
+| `GET` | `/v1/health` | Health check (includes Redis status in async mode) |
+| `POST` | `/v1/renders` | Create a render job (returns 202 in async mode) |
+| `GET` | `/v1/renders` | List recent renders with pagination |
+| `GET` | `/v1/renders/{id}` | Get render status, progress, and output URLs |
+| `DELETE` | `/v1/renders/{id}` | Cancel a queued or running render |
 | `GET` | `/v1/renders/{id}/download` | Download rendered output |
 
 Interactive API docs at `http://localhost:8000/docs` (Swagger) or `/redoc`.
@@ -110,23 +112,24 @@ Interactive API docs at `http://localhost:8000/docs` (Swagger) or `/redoc`.
 
 - **FastAPI** - Async web framework with auto OpenAPI docs
 - **Pydantic v2** - Discriminated unions for composition schema validation
+- **ARQ + Redis** - Async job queue for render workers
 - **SQLModel + aiosqlite** - Async database (SQLite dev, PostgreSQL planned)
 - **Alembic** - Database migrations
 - **Editly** - Default video renderer (Node.js subprocess)
-- **FFmpeg** - Video encoding, poster extraction, media probing
+- **FFmpeg** - Video encoding, poster extraction, audio mixing, media probing
 - **Pillow** - Text-to-image rendering with bundled fonts
 - **httpx** - Async asset downloads with SSRF protection
 - **structlog** - Structured JSON logging
 
 ## Project Status
 
-Phase 00 (Foundation) is complete. See [PRD](.spec_system/PRD/PRD.md) for
+Phases 00 and 01 are complete. See [PRD](.spec_system/PRD/PRD.md) for
 current progress and roadmap.
 
 | Phase | Name | Status |
 |-------|------|--------|
 | 00 | Foundation | Complete (5/5 sessions) |
-| 01 | Async Jobs and Multi-track | In Progress (5/5 sessions) |
+| 01 | Async Jobs and Multi-track | Complete (5/5 sessions) |
 | 02 | Templates and Polish | Not Started |
 | 03 | Production Hardening | Not Started |
 | 04 | Advanced Rendering | Not Started |

@@ -1,7 +1,7 @@
 # Security & Compliance
 
 > Cumulative security posture and GDPR compliance record. Updated between phases via carryforward.
-> **Line budget**: 1000 max | **Last updated**: Phase 00 (2026-05-05)
+> **Line budget**: 1000 max | **Last updated**: Phase 01 (2026-05-05)
 
 ---
 
@@ -14,8 +14,8 @@
 | Open Findings | 0 |
 | Critical/High | 0 |
 | Medium/Low | 0 |
-| Phases Audited | 1 |
-| Last Clean Phase | P00 |
+| Phases Audited | 2 |
+| Last Clean Phase | P01 |
 
 ---
 
@@ -37,7 +37,7 @@ No open findings.
 
 ### Overall: N/A
 
-No personal data is collected, stored, or processed by VidAPI in its current state. The service accepts JSON composition definitions containing media asset references (URLs, text strings for overlays) and rendering parameters. No user PII enters the system.
+No personal data is collected, stored, or processed by VidAPI. The service accepts JSON composition definitions containing media asset references (URLs, text strings for overlays) and rendering parameters. No user PII enters the system.
 
 ### Personal Data Inventory
 
@@ -51,8 +51,8 @@ No personal data collected or processed.
 | Consent obtained before data storage | N/A | No personal data collected |
 | Data minimization verified | N/A | No personal data in scope |
 | Deletion/erasure path exists | N/A | No personal data stored |
-| No PII in application logs | PASS | Logs contain only request IDs (UUID), file paths, hashes, error codes, and timing metadata |
-| Third-party transfers documented | N/A | No external services contacted beyond user-provided asset URLs |
+| No PII in application logs | PASS | Logs contain only render_id (UUID), file paths, hashes, error codes, stage names, and timing metadata |
+| Third-party transfers documented | N/A | No external services contacted beyond user-provided asset URLs; Redis is self-hosted |
 
 ---
 
@@ -60,15 +60,20 @@ No personal data collected or processed.
 
 ### Current Vulnerabilities
 
-No known vulnerable dependencies.
+| Package | Version | Severity | CVE | Status |
+|---------|---------|----------|-----|--------|
+| starlette | <0.49.1 | Medium | CVE-2025-54121 | Open (pre-existing P00) |
+| starlette | <0.49.1 | Medium | CVE-2025-62727 | Open (pre-existing P00) |
 
-**Dependencies audited (Phase 00):**
+**Dependencies audited (Phase 01):**
+- arq 0.28.0, redis[hiredis] 5.3.1 -- no known CVEs (added P01-S01)
 - fastapi, uvicorn, pydantic, pydantic-settings -- web framework stack
 - sqlmodel, aiosqlite, alembic -- database stack
 - httpx -- async HTTP client for asset fetching
 - Pillow -- text-to-image rendering
 - structlog -- structured logging
 - System-level: FFmpeg 6.1.1, Node.js v24.14.0, Editly (Node subprocess)
+- Docker base images: python:3.11-slim, node:20-slim, redis:7-alpine
 
 ---
 
@@ -83,6 +88,7 @@ No resolved findings yet.
 | Phase | Sessions | Security | GDPR | Findings Opened | Findings Closed |
 |-------|----------|----------|------|-----------------|-----------------|
 | P00 | 5 | PASS | N/A | 0 | 0 |
+| P01 | 5 | PASS | N/A | 0 | 0 |
 
 ---
 
@@ -90,11 +96,13 @@ No resolved findings yet.
 
 Actionable items for upcoming phases based on cumulative findings.
 
-1. **Restrict CORS origins for production** (Phase 01+): Default wildcard ["*"] must be replaced with specific allowed domains when deploying beyond local development.
-2. **Add rate limiting on POST /v1/renders** (Phase 01): Prevent resource exhaustion via rapid render submissions before async workers absorb the load.
-3. **Scope render access to authenticated users** (Phase 03): Currently any client with a render_id can access render status and download output. Authentication must gate access.
-4. **Validate asset paths in layer mapper** (Phase 01): Confirm no path traversal is possible when resolved asset paths are passed to the Editly compiled spec.
-5. **Implement render log rotation or workspace cleanup** (Phase 01): Subprocess stderr logs and workspace directories accumulate without bounds.
+1. **Upgrade starlette >= 0.49.1** to resolve CVE-2025-54121 and CVE-2025-62727. These are medium-severity pre-existing issues that should be addressed in the next maintenance pass.
+2. **Add Redis AUTH for production** (Phase 03): Docker Redis currently runs without a password. Production deployments must require authentication via requirepass or ACL.
+3. **Enable Redis TLS for production** (Phase 03): REDIS_URL supports rediss:// scheme for encrypted connections. Enforce in production environments.
+4. **Add Docker secrets support** (Phase 03): Production credentials should use Docker secrets or Vault rather than environment variables in .env files.
+5. **Restrict CORS origins for production** (Phase 02+): Default wildcard ["*"] must be replaced with specific allowed domains.
+6. **Scope render access to authenticated users** (Phase 03): Currently any client with a render_id can access status and output.
+7. **Implement rate limiting on POST /v1/renders** (Phase 02): Prevent resource exhaustion via rapid submissions.
 
 ---
 

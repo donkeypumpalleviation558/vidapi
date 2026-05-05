@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import structlog
 
@@ -20,7 +21,7 @@ class LogEntry:
         message: str,
         *,
         level: str = "INFO",
-        extra: dict | None = None,
+        extra: dict[str, Any] | None = None,
     ) -> None:
         self.timestamp = datetime.now(tz=UTC).isoformat(timespec="seconds")
         self.stage = stage
@@ -68,7 +69,7 @@ class RenderLogCollector:
         message: str,
         *,
         level: str = "INFO",
-        extra: dict | None = None,
+        extra: dict[str, Any] | None = None,
     ) -> None:
         """Record a log entry for the current pipeline stage."""
         self._entries.append(LogEntry(stage, message, level=level, extra=extra))
@@ -78,7 +79,7 @@ class RenderLogCollector:
         stage: str,
         message: str,
         *,
-        extra: dict | None = None,
+        extra: dict[str, Any] | None = None,
     ) -> None:
         """Record an error-level log entry."""
         self.add(stage, message, level="ERROR", extra=extra)

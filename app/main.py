@@ -12,8 +12,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.errors import register_error_handlers
 from app.api.routes_health import router as health_router
 from app.api.routes_renders import router as renders_router
+from app.api.routes_templates import router as templates_router
 from app.core.config import get_settings
 from app.core.logging import setup_logging
+from app.core.rate_limit import RateLimitMiddleware
 from app.core.redis import close_arq_pool, create_arq_pool
 from app.db.session import create_tables, dispose_engine
 
@@ -56,6 +58,8 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    app.add_middleware(RateLimitMiddleware)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -81,6 +85,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(health_router, prefix="/v1")
     app.include_router(renders_router, prefix="/v1")
+    app.include_router(templates_router, prefix="/v1")
 
     return app
 

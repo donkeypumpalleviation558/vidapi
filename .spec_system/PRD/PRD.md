@@ -1039,7 +1039,7 @@ This system delivers the product via phases. Each phase is implemented via multi
 |-------|------|----------|--------|
 | 00 | Foundation | 5 | Complete (5/5) |
 | 01 | Async Jobs and Multi-track | 5 | Complete (5/5) |
-| 02 | Templates and Polish | TBD | Not Started |
+| 02 | Templates and Polish | 5 | Not Started |
 | 03 | Production Hardening | TBD | Not Started |
 | 04 | Advanced Rendering | TBD | Not Started |
 
@@ -1130,6 +1130,18 @@ Make VidAPI useful for repeatable programmatic video generation.
 - A product-ad style template can render multiple variations.
 - Historical renders remain reproducible after template updates.
 - Webhook attempts are recorded and signed.
+
+### Sessions
+
+| Session | Name | Est. Tasks |
+|---------|------|------------|
+| 01 | Template Models and CRUD API | ~20 |
+| 02 | Template Variables and Rendering | ~18 |
+| 03 | Webhook Delivery System | ~18 |
+| 04 | Transitions and Positioning | ~16 |
+| 05 | Audio Polish and Hardening | ~15 |
+
+Session stubs: `.spec_system/PRD/phase_02/`
 
 ## Phase 03: Production Hardening
 

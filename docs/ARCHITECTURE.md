@@ -14,24 +14,33 @@ Client
   |
   | POST /v1/renders (JSON composition)
   v
-FastAPI API (validate, create record, run pipeline)
+FastAPI API (validate, create record, enqueue)
   |
   v
-Render Service
-  |-- Merge Service (variable substitution)
-  |-- Asset Service (fetch, validate, cache)
-  |   |-- SSRF Validator
-  |   |-- ffprobe (media validation)
-  |   |-- Text Renderer (Pillow PNG)
+Redis (ARQ job queue)
   |
-  |-- Renderer (compile + render)
-  |   |-- Editly Renderer (Node subprocess)
-  |   |   |-- Segment Compiler (timeline -> sequential clips)
-  |   |   |-- FFmpeg (invoked by Editly)
+  v
+Render Worker (ARQ consumer)
+  |-- Workspace Manager (isolated per-job directories)
+  |-- Log Collector (structured render logs)
+  |-- Cancellation Checkpoints (cooperative cancel via DB flag)
+  |
+  |-- Render Service (stage methods)
+  |   |-- Merge Service (variable substitution)
+  |   |-- Asset Service (fetch, validate, cache)
+  |   |   |-- SSRF Validator
+  |   |   |-- ffprobe (media validation)
+  |   |   |-- Text Renderer (Pillow PNG)
   |   |
-  |   |-- Poster Generator (FFmpeg frame extraction)
-  |
-  |-- Storage Adapter (persist artifacts)
+  |   |-- Renderer (compile + render)
+  |   |   |-- Editly Renderer (Node subprocess)
+  |   |   |   |-- Segment Compiler (timeline -> sequential clips)
+  |   |   |   |-- FFmpeg (invoked by Editly)
+  |   |   |
+  |   |   |-- Audio Mixer (FFmpeg post-process for detached audio)
+  |   |   |-- Poster Generator (FFmpeg frame extraction)
+  |   |
+  |   |-- Storage Adapter (persist artifacts)
   v
 SQLite Database (render metadata)
 Local Filesystem (render artifacts)
@@ -40,7 +49,7 @@ Local Filesystem (render artifacts)
 ## Components
 
 ### FastAPI API
-- **Purpose**: HTTP layer -- validates requests, delegates to services, returns responses
+- **Purpose**: HTTP layer -- validates requests, enqueues jobs, returns status
 - **Tech**: FastAPI, Pydantic v2, structlog
 - **Location**: `app/api/`
 
@@ -49,8 +58,28 @@ Local Filesystem (render artifacts)
 - **Tech**: Pydantic v2 discriminated unions for asset types
 - **Location**: `app/models/composition.py`
 
+### Redis + ARQ Queue
+- **Purpose**: Async job queue decoupling API from render processing
+- **Tech**: ARQ (async Redis queue), redis[hiredis]
+- **Location**: `app/core/redis.py` (pool), `app/workers/arq_settings.py` (config)
+
+### Render Worker
+- **Purpose**: ARQ consumer that drives the render pipeline stage-by-stage
+- **Tech**: ARQ worker process, cooperative cancellation, progress callbacks
+- **Location**: `app/workers/render_worker.py`
+
+### Workspace Manager
+- **Purpose**: Creates isolated per-job directories; handles cleanup on success/failure
+- **Tech**: Filesystem operations with configurable cleanup policy
+- **Location**: `app/workers/workspace.py`
+
+### Log Collector
+- **Purpose**: Buffers structured per-render log entries; flushes atomically to logs.txt
+- **Tech**: In-memory buffer with single atomic write
+- **Location**: `app/workers/log_collector.py`
+
 ### Render Service
-- **Purpose**: Orchestrates the full render pipeline (validate, resolve, compile, render, store)
+- **Purpose**: Stateless stage methods (validate, resolve, compile, render, store)
 - **Tech**: Python async, structlog context binding
 - **Location**: `app/services/render_service.py`
 
@@ -61,13 +90,18 @@ Local Filesystem (render artifacts)
 
 ### Editly Renderer
 - **Purpose**: Compiles VidAPI compositions to Editly JSON and invokes Editly as a Node subprocess
-- **Tech**: Segment compiler (pure functions), asyncio subprocess
+- **Tech**: Segment compiler (pure functions), asyncio subprocess, streaming stderr with progress/cancel callbacks
 - **Location**: `app/renderers/editly.py`
 
 ### Segment Compiler
 - **Purpose**: Converts absolute-time timeline clips into sequential Editly clips with layers
 - **Tech**: Pure functions -- collect boundaries, generate segments, map layers
 - **Location**: `app/renderers/editly.py` (functions: `collect_boundaries`, `generate_segments`)
+
+### Audio Mixer
+- **Purpose**: Post-processes rendered video to mix detached audio clips with correct timing
+- **Tech**: FFmpeg complex filter graph (-c:v copy), two-pass architecture
+- **Location**: `app/services/audio_mixer.py`
 
 ### Poster Generator
 - **Purpose**: Extracts a frame from rendered video as a JPEG poster
@@ -90,13 +124,14 @@ Local Filesystem (render artifacts)
 |------------|---------|------------|
 | FastAPI | Web framework | Async-native, Pydantic integration, auto OpenAPI docs |
 | Pydantic v2 | Schema validation | Discriminated unions for asset types, fast validation |
+| ARQ + Redis | Job queue | Async-native, lightweight, fits FastAPI model |
 | SQLModel + aiosqlite | Database | Async SQLite for dev, same API for future PostgreSQL |
 | Alembic | Migrations | Standard Python migration tool, async-compatible |
 | structlog | Logging | Structured JSON logs with context binding |
 | httpx | HTTP client | Async, manual redirect control for SSRF validation |
 | Pillow | Text rendering | Deterministic text-to-PNG with bundled fonts |
 | Editly (Node.js) | Video rendering | Declarative timeline editing, reduces custom FFmpeg work |
-| FFmpeg | Video encoding | Industry standard, poster extraction, media probing |
+| FFmpeg | Video encoding | Poster extraction, audio mixing, media probing |
 | hatchling | Build backend | Modern, lightweight, explicit package discovery |
 
 ## Data Layer
@@ -107,18 +142,36 @@ Local Filesystem (render artifacts)
 
 ## Data Flow
 
+### Async Mode (default with Docker Compose)
+
 1. Client POSTs JSON composition to `/v1/renders`
 2. Pydantic validates the composition schema
 3. Render record created in SQLite with status `queued`
-4. Merge variables substituted if present
-5. Assets resolved: remote fetched via httpx, text rendered to PNG, all cached by SHA-256
-6. Segment compiler converts absolute-time timeline to sequential Editly clips
-7. Compiled Editly JSON + replay metadata written to workspace
-8. Editly invoked as Node subprocess with timeout
-9. Poster extracted from output via FFmpeg
-10. Artifacts persisted to storage: input.json, expanded.json, compiled.editly.json, replay.json, output.mp4, poster.jpg, logs.txt
-11. Render status updated to `succeeded` or `failed`
-12. Client polls GET `/v1/renders/{id}` for status and download URL
+4. Input JSON persisted to workspace; job enqueued to Redis via ARQ
+5. API returns 202 Accepted with render ID immediately
+6. Worker picks up job, creates isolated workspace
+7. Worker drives pipeline: fetching -> compiling -> rendering -> uploading
+8. Assets resolved: remote fetched via httpx, text rendered to PNG, all cached by SHA-256
+9. Segment compiler converts absolute-time timeline to sequential Editly clips
+10. Compiled Editly JSON + replay metadata written to workspace
+11. Editly invoked as Node subprocess with timeout; progress parsed from FFmpeg stderr
+12. Detached audio clips mixed via FFmpeg post-processing (two-pass, -c:v copy)
+13. Poster extracted from output via FFmpeg
+14. Artifacts persisted to storage
+15. Render status updated to `succeeded` or `failed`
+16. Client polls GET `/v1/renders/{id}` for status, progress, and download URL
+
+### Cancellation Flow
+
+1. Client sends DELETE `/v1/renders/{id}`
+2. Queued jobs: immediate transition to `cancelled`
+3. Running jobs: `cancel_requested_at` flag set in DB
+4. Worker checks flag between stages and during stderr streaming
+5. On detection: subprocess terminated (SIGTERM, then SIGKILL), status set to `cancelled`
+
+### Sync Mode (local development without Redis)
+
+Same pipeline stages run synchronously within the API request when `RENDER_MODE=sync`.
 
 ## Key Decisions
 
@@ -130,5 +183,11 @@ Local Filesystem (render artifacts)
 | Non-fatal poster generation | Warning on failure | Missing poster should not fail a successful render |
 | Manual redirect following | Per-hop SSRF check | Prevents redirect-to-private-IP attacks |
 | Track 0 on bottom | Natural z-order | Matches Editly layer ordering |
+| ARQ over Celery | Lightweight async queue | Fits FastAPI async model, simpler than Celery |
+| Worker drives status transitions | Stateless service methods | Required for progress tracking and cancellation |
+| Cooperative cancellation via DB flag | Not ARQ abort | Renderer-agnostic, easier to test |
+| Two-pass audio mixing | FFmpeg post-process | Editly audioTracks lacks per-track timing; -c:v copy avoids re-encoding |
+| Workspace isolation per job | Separate WorkspaceManager | Single responsibility, concurrent safety |
+| Xvfb in worker container | Virtual framebuffer | Editly's gl module needs an OpenGL context |
 
 See [.spec_system/PRD/PRD.md](.spec_system/PRD/PRD.md) for full architecture decisions.

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from app.core.config import get_settings
 from app.core.redis import get_redis_settings
@@ -16,7 +16,7 @@ class WorkerSettings:
     Start with: arq app.workers.arq_settings.WorkerSettings
     """
 
-    functions: ClassVar[list] = [run_render]
+    functions: ClassVar[list[Any]] = [run_render]
     on_startup = worker_startup
     on_shutdown = worker_shutdown
 

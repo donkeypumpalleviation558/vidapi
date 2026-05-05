@@ -171,7 +171,7 @@ Platform: GitHub Actions
 | Bundle | Status | Workflow |
 |--------|--------|----------|
 | Code Quality | configured | .github/workflows/quality.yml |
-| Build & Test | not configured | - |
+| Build & Test | configured | .github/workflows/test.yml |
 | Security | not configured | - |
 | Integration | not configured | - |
 | Operations | not configured | - |
@@ -184,8 +184,8 @@ Platform: GitHub Actions
 | Hosting | Docker | Multi-stage build (Python + Node + FFmpeg) |
 | Database | SQLite (dev) / PostgreSQL (prod) | Async via SQLModel |
 | Local Dev | docker compose up | Port 8000, healthcheck configured |
-| WAF | not configured | - |
-| Rate Limit | not configured | - |
+| WAF | not configured | Requires reverse proxy or CDN (Cloudflare recommended) |
+| Rate Limit | Custom middleware | 60/min default, 10/min POST /renders, health exempt |
 | Backup | not configured | - |
 | Deploy | not configured | - |
 

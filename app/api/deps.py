@@ -13,6 +13,7 @@ from app.db.session import get_session
 from app.renderers.editly import EditlyRenderer
 from app.services.asset_service import AssetService
 from app.services.render_service import RenderService
+from app.services.template_service import TemplateService
 from app.storage.local import LocalStorage
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -60,6 +61,12 @@ def get_render_service() -> RenderService:
     )
 
 
+@lru_cache(maxsize=1)
+def get_template_service() -> TemplateService:
+    return TemplateService()
+
+
+TemplateServiceDep = Annotated[TemplateService, Depends(get_template_service)]
 StorageDep = Annotated[LocalStorage, Depends(get_local_storage)]
 AssetServiceDep = Annotated[AssetService, Depends(get_asset_service)]
 EditlyRendererDep = Annotated[EditlyRenderer, Depends(get_editly_renderer)]
