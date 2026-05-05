@@ -63,6 +63,16 @@ class Settings(BaseSettings):
     ]
     ffprobe_timeout_seconds: int = 30
 
+    editly_bin: str = "editly"
+    editly_timeout_seconds: int = 600
+    editly_fast_mode: bool = False
+
+    poster_enabled: bool = True
+    poster_timestamp_percent: float = 0.25
+    poster_format: str = "jpg"
+    poster_quality: int = 85
+    poster_timeout_seconds: int = 30
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
