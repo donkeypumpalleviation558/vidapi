@@ -15,6 +15,7 @@ from app.models.error_codes import ErrorCode, error_code_for_exception
 from app.models.render import RenderStatus
 from app.services.ffmpeg_progress import compute_progress_percent, parse_time_from_line
 from app.services.render_service import RenderService, RenderServiceError
+from app.services.webhook_service import dispatch_webhook
 from app.workers.log_collector import RenderLogCollector
 from app.workers.workspace import WorkspaceManager
 
@@ -182,6 +183,7 @@ async def _cancel_render(
                 stage="cancelled",
             )
     log_collector.add("cancelled", "Render cancelled by user request")
+    _fire_webhook(session_factory, render_id, "render.cancelled")
     await logger.ainfo("worker_render_cancelled", render_id=render_id)
 
 
@@ -341,8 +343,34 @@ async def _execute_pipeline(
             )
         log_collector.add("complete", "Status -> SUCCEEDED")
 
+        _fire_webhook(session_factory, render_id, "render.succeeded")
+
     with contextlib.suppress(_PipelineCancelledError):
         await asyncio.wait_for(_inner(), timeout=timeout)
+
+
+_webhook_tasks: set[asyncio.Task[None]] = set()
+
+
+def _fire_webhook(
+    session_factory: Any,
+    render_id: str,
+    event: str,
+) -> None:
+    """Schedule a non-blocking webhook dispatch via asyncio.create_task.
+
+    Tracks the task in _webhook_tasks to prevent garbage collection and
+    cleans up on completion.
+    """
+    task = asyncio.create_task(
+        dispatch_webhook(
+            session_factory=session_factory,
+            render_id=render_id,
+            event=event,
+        )
+    )
+    _webhook_tasks.add(task)
+    task.add_done_callback(_webhook_tasks.discard)
 
 
 class _PipelineCancelledError(Exception):
@@ -388,6 +416,8 @@ async def _mark_failed(
                 error_message=error_message[:500],
                 stage="failed",
             )
+
+    _fire_webhook(session_factory, render_id, "render.failed")
 
     await logger.aerror(
         "worker_task_failed",

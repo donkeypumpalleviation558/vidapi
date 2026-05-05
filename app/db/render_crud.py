@@ -15,11 +15,13 @@ async def create_render(
     *,
     template_id: str | None = None,
     template_version_id: str | None = None,
+    callback_url: str | None = None,
 ) -> Render:
     """Create a new render record in QUEUED status."""
     render = Render(
         template_id=template_id,
         template_version_id=template_version_id,
+        callback_url=callback_url,
     )
     session.add(render)
     await session.commit()

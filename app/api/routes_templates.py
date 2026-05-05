@@ -310,6 +310,7 @@ async def render_template(
         session,
         template_id=tmpl_id,
         template_version_id=version_id,
+        callback_url=body.callback,
     )
     render_id = render.id
 

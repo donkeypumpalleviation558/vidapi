@@ -62,7 +62,8 @@ async def _create_render_async(
     arq_pool: ArqRedis,
 ) -> CreateRenderResponse:
     """Async path: create record, persist input, enqueue job."""
-    render = await render_crud.create_render(session)
+    callback_url = str(composition.callback) if composition.callback else None
+    render = await render_crud.create_render(session, callback_url=callback_url)
     render_id = render.id
 
     from app.api.deps import get_local_storage

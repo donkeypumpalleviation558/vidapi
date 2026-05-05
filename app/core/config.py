@@ -88,6 +88,11 @@ class Settings(BaseSettings):
     poster_quality: int = 85
     poster_timeout_seconds: int = 30
 
+    webhook_secret: str = ""
+    webhook_timeout_seconds: int = 10
+    webhook_max_retries: int = 3
+    webhook_retry_delays: list[int] = [1, 10, 60]
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
