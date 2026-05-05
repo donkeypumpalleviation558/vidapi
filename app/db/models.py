@@ -57,6 +57,8 @@ class Render(SQLModel, table=True):
     error_code: str | None = Field(default=None)
     error_message: str | None = Field(default=None)
 
+    cancel_requested_at: datetime | None = Field(default=None)
+
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)
     started_at: datetime | None = Field(default=None)

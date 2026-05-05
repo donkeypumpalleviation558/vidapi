@@ -73,6 +73,8 @@ class Settings(BaseSettings):
     editly_timeout_seconds: int = 600
     editly_fast_mode: bool = False
 
+    progress_update_interval_seconds: float = 2.0
+
     poster_enabled: bool = True
     poster_timestamp_percent: float = 0.25
     poster_format: str = "jpg"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -68,6 +69,82 @@ async def update_render_status(
         render.completed_at = datetime.now(tz=UTC)
         if new_status == RenderStatus.SUCCEEDED:
             render.progress = 100
+
+    session.add(render)
+    await session.commit()
+    await session.refresh(render)
+    return render
+
+
+async def list_renders(
+    session: AsyncSession,
+    *,
+    offset: int = 0,
+    limit: int = 20,
+    status_filter: RenderStatus | None = None,
+) -> tuple[list[Render], int]:
+    """Return paginated render list ordered by created_at DESC.
+
+    Returns (items, total_count).
+    """
+    base = select(Render)
+    count_stmt = select(func.count()).select_from(Render)
+
+    if status_filter is not None:
+        base = base.where(Render.status == status_filter.value)
+        count_stmt = count_stmt.where(Render.status == status_filter.value)
+
+    count_result = await session.execute(count_stmt)
+    total = count_result.scalar_one()
+
+    query = base.order_by(Render.created_at.desc()).offset(offset).limit(limit)
+    result = await session.execute(query)
+    items = list(result.scalars().all())
+
+    return items, total
+
+
+async def set_cancel_requested(
+    session: AsyncSession,
+    render_id: str,
+) -> Render | None:
+    """Set cancel_requested_at timestamp on a render.
+
+    Idempotent: if already set, preserves the original timestamp.
+    Returns None if render not found.
+    """
+    render = await get_render_by_id(session, render_id)
+    if render is None:
+        return None
+
+    if render.cancel_requested_at is not None:
+        return render
+
+    render.cancel_requested_at = datetime.now(tz=UTC)
+    render.updated_at = datetime.now(tz=UTC)
+
+    session.add(render)
+    await session.commit()
+    await session.refresh(render)
+    return render
+
+
+async def update_render_progress(
+    session: AsyncSession,
+    render_id: str,
+    progress: int,
+) -> Render | None:
+    """Update the progress field on a render record.
+
+    Clamps progress to [0, 100]. Returns None if render not found.
+    """
+    render = await get_render_by_id(session, render_id)
+    if render is None:
+        return None
+
+    clamped = max(0, min(100, progress))
+    render.progress = clamped
+    render.updated_at = datetime.now(tz=UTC)
 
     session.add(render)
     await session.commit()

@@ -13,6 +13,8 @@ from app.db import render_crud
 from app.models.composition import Composition
 from app.models.render import (
     CreateRenderResponse,
+    RenderListItem,
+    RenderListResponse,
     RenderResponse,
     RenderStatus,
 )
@@ -116,6 +118,113 @@ async def _create_render_sync(
         progress=render.progress,
         created_at=render.created_at,
     )
+
+
+@router.get(
+    "/renders",
+    response_model=RenderListResponse,
+)
+async def list_renders(
+    session: DBSessionDep,
+    offset: int = 0,
+    limit: int = 20,
+    status_filter: str | None = None,
+) -> RenderListResponse:
+    """Return paginated list of render jobs ordered by created_at DESC."""
+    if limit < 1:
+        limit = 1
+    if limit > 100:
+        limit = 100
+    if offset < 0:
+        offset = 0
+
+    parsed_status: RenderStatus | None = None
+    if status_filter is not None:
+        try:
+            parsed_status = RenderStatus(status_filter)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid status filter: {status_filter}",
+            ) from exc
+
+    items, total = await render_crud.list_renders(
+        session,
+        offset=offset,
+        limit=limit,
+        status_filter=parsed_status,
+    )
+
+    return RenderListResponse(
+        items=[
+            RenderListItem(
+                id=r.id,
+                status=RenderStatus(r.status),
+                progress=r.progress,
+                created_at=r.created_at,
+                started_at=r.started_at,
+                completed_at=r.completed_at,
+            )
+            for r in items
+        ],
+        total=total,
+        offset=offset,
+        limit=limit,
+    )
+
+
+@router.delete(
+    "/renders/{render_id}",
+    status_code=status.HTTP_200_OK,
+)
+async def cancel_render(
+    render_id: str,
+    session: DBSessionDep,
+) -> dict:
+    """Cancel a render job.
+
+    Queued renders transition immediately to CANCELLED.
+    Active renders get cancel_requested_at flag set for cooperative cancellation.
+    Already-cancelled renders return success (idempotent).
+    Terminal renders (succeeded/failed) return 409.
+    """
+    render = await render_crud.get_render_by_id(session, render_id)
+    if render is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Render {render_id} not found",
+        )
+
+    current_status = RenderStatus(render.status)
+
+    if current_status == RenderStatus.CANCELLED:
+        return {"id": render_id, "status": "cancelled", "detail": "Already cancelled"}
+
+    if current_status in (RenderStatus.SUCCEEDED, RenderStatus.FAILED):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(f"Cannot cancel render in terminal state: {current_status.value}"),
+        )
+
+    if current_status == RenderStatus.QUEUED:
+        await render_crud.update_render_status(
+            session,
+            render_id,
+            RenderStatus.CANCELLED,
+            stage="cancelled",
+        )
+        return {
+            "id": render_id,
+            "status": "cancelled",
+            "detail": "Cancelled immediately",
+        }
+
+    await render_crud.set_cancel_requested(session, render_id)
+    return {
+        "id": render_id,
+        "status": current_status.value,
+        "detail": "Cancel requested; worker will stop at next checkpoint",
+    }
 
 
 @router.get(

@@ -41,7 +41,8 @@
     "phase00-session04-editly-renderer-and-segment-compiler",
     "phase00-session05-render-service-and-api-endpoints",
     "phase01-session01-redis-arq-queue-integration",
-    "phase01-session02-worker-render-pipeline"
+    "phase01-session02-worker-render-pipeline",
+    "phase01-session03-progress-tracking-and-cancellation"
   ],
   "next_session_history": [
     {
@@ -142,6 +143,21 @@
     {
       "date": "2026-05-05",
       "session": "phase01-session02-worker-render-pipeline",
+      "status": "completed"
+    },
+    {
+      "date": "2026-05-05",
+      "session": "phase01-session03-progress-tracking-and-cancellation",
+      "status": "planned"
+    },
+    {
+      "date": "2026-05-05",
+      "session": "phase01-session03-progress-tracking-and-cancellation",
+      "status": "validated"
+    },
+    {
+      "date": "2026-05-05",
+      "session": "phase01-session03-progress-tracking-and-cancellation",
       "status": "completed"
     }
   ]

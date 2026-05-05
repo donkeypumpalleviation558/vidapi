@@ -89,7 +89,7 @@ def mock_service(tmp_path: Path) -> RenderService:
             spec_json="{}",
         )
 
-    async def _stage_render(composition, compiled, render_id, ws, session):
+    async def _stage_render(composition, compiled, render_id, ws, session, **kwargs):
         pass
 
     service.stage_validate_and_expand = AsyncMock(side_effect=_stage_validate)

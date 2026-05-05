@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import time
 from typing import Any
 
 import structlog
@@ -11,6 +13,7 @@ from app.db import render_crud
 from app.db.session import _get_engine
 from app.models.error_codes import ErrorCode, error_code_for_exception
 from app.models.render import RenderStatus
+from app.services.ffmpeg_progress import compute_progress_percent, parse_time_from_line
 from app.services.render_service import RenderService, RenderServiceError
 from app.workers.log_collector import RenderLogCollector
 from app.workers.workspace import WorkspaceManager
@@ -51,6 +54,19 @@ async def run_render(ctx: dict[str, Any], render_id: str) -> None:
                 "worker_render_already_terminal",
                 render_id=render_id,
                 status=render.status,
+            )
+            return
+
+        if render.cancel_requested_at is not None:
+            await logger.ainfo(
+                "worker_render_cancelled_on_pickup",
+                render_id=render_id,
+            )
+            await render_crud.update_render_status(
+                session,
+                render_id,
+                RenderStatus.CANCELLED,
+                stage="cancelled",
             )
             return
 
@@ -140,6 +156,75 @@ async def run_render(ctx: dict[str, Any], render_id: str) -> None:
         structlog.contextvars.unbind_contextvars("render_id")
 
 
+async def _check_cancelled(session_factory: Any, render_id: str) -> bool:
+    """Check if cancel has been requested for this render."""
+    async with session_factory() as session:
+        render = await render_crud.get_render_by_id(session, render_id)
+        if render is None:
+            return True
+        return render.cancel_requested_at is not None
+
+
+async def _cancel_render(
+    session_factory: Any,
+    render_id: str,
+    log_collector: RenderLogCollector,
+    workspace: Any,
+) -> None:
+    """Transition render to CANCELLED and clean up."""
+    async with session_factory() as session:
+        render = await render_crud.get_render_by_id(session, render_id)
+        if render is not None and not RenderStatus(render.status).is_terminal:
+            await render_crud.update_render_status(
+                session,
+                render_id,
+                RenderStatus.CANCELLED,
+                stage="cancelled",
+            )
+    log_collector.add("cancelled", "Render cancelled by user request")
+    await logger.ainfo("worker_render_cancelled", render_id=render_id)
+
+
+def _make_progress_callback(
+    session_factory: Any,
+    render_id: str,
+    total_duration: float,
+    settings: Any,
+) -> Any:
+    """Build an async progress callback for the renderer.
+
+    Rate-limits DB writes to at most once per progress_update_interval_seconds
+    and requires >= 2% delta from last reported progress.
+    """
+    state = {"last_progress": 0, "last_update_time": 0.0}
+
+    async def _callback(line: str) -> None:
+        elapsed = parse_time_from_line(line)
+        if elapsed is None:
+            return
+
+        percent = compute_progress_percent(elapsed, total_duration)
+        delta = percent - state["last_progress"]
+        if delta < 2:
+            return
+
+        now = time.monotonic()
+        interval = settings.progress_update_interval_seconds
+        if now - state["last_update_time"] < interval:
+            return
+
+        state["last_progress"] = percent
+        state["last_update_time"] = now
+
+        try:
+            async with session_factory() as session:
+                await render_crud.update_render_progress(session, render_id, percent)
+        except Exception:
+            pass
+
+    return _callback
+
+
 async def _execute_pipeline(
     *,
     session_factory: Any,
@@ -151,9 +236,19 @@ async def _execute_pipeline(
     log_collector: RenderLogCollector,
 ) -> None:
     """Drive all pipeline stages with status transitions and timeout."""
+    settings = get_settings()
 
     async def _inner() -> None:
+        # Cancellation checkpoint helper
+        async def _checkpoint() -> None:
+            if await _check_cancelled(session_factory, render_id):
+                await _cancel_render(
+                    session_factory, render_id, log_collector, workspace
+                )
+                raise _PipelineCancelledError()
+
         # Stage 1: FETCHING - validate and expand
+        await _checkpoint()
         async with session_factory() as session:
             await render_crud.update_render_status(
                 session,
@@ -171,6 +266,7 @@ async def _execute_pipeline(
         log_collector.add("fetching", "Validation and expansion complete")
 
         # Stage 2: COMPILING - resolve assets and compile
+        await _checkpoint()
         async with session_factory() as session:
             await render_crud.update_render_status(
                 session,
@@ -188,23 +284,43 @@ async def _execute_pipeline(
         log_collector.add("compiling", "Compilation complete")
 
         # Stage 3: RENDERING - render video and store artifacts
+        await _checkpoint()
         async with session_factory() as session:
             await render_crud.update_render_status(
                 session,
                 render_id,
                 RenderStatus.RENDERING,
                 stage="rendering",
-                progress=50,
+                progress=30,
             )
         log_collector.add("rendering", "Status -> RENDERING")
 
+        # Compute total duration for progress percentage
+        from app.renderers.editly import compute_total_duration
+
+        total_duration = compute_total_duration(composition.timeline.tracks)
+
+        progress_cb = _make_progress_callback(
+            session_factory, render_id, total_duration, settings
+        )
+
+        async def _cancel_check() -> bool:
+            return await _check_cancelled(session_factory, render_id)
+
         async with session_factory() as session:
             await render_service.stage_render_and_store(
-                expanded, compiled, render_id, workspace, session
+                expanded,
+                compiled,
+                render_id,
+                workspace,
+                session,
+                progress_callback=progress_cb,
+                cancel_check=_cancel_check,
             )
         log_collector.add("rendering", "Render and store complete")
 
         # Stage 4: UPLOADING -> SUCCEEDED
+        await _checkpoint()
         async with session_factory() as session:
             await render_crud.update_render_status(
                 session,
@@ -225,7 +341,12 @@ async def _execute_pipeline(
             )
         log_collector.add("complete", "Status -> SUCCEEDED")
 
-    await asyncio.wait_for(_inner(), timeout=timeout)
+    with contextlib.suppress(_PipelineCancelledError):
+        await asyncio.wait_for(_inner(), timeout=timeout)
+
+
+class _PipelineCancelledError(Exception):
+    """Internal signal: pipeline was cancelled cooperatively."""
 
 
 def _resolve_error_code(exc: Exception) -> ErrorCode:

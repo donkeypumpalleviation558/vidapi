@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import time
@@ -538,8 +539,19 @@ class EditlyRenderer:
         compiled: CompiledRender,
         *,
         timeout_seconds: int | None = None,
+        progress_callback: Any | None = None,
+        cancel_check: Any | None = None,
     ) -> RenderArtifact:
-        """Invoke Editly subprocess and produce output artifacts."""
+        """Invoke Editly subprocess and produce output artifacts.
+
+        Args:
+            compiled: The compiled render spec.
+            timeout_seconds: Max time to wait for subprocess.
+            progress_callback: Optional async callable(line: str) called for
+                each stderr line during rendering.
+            cancel_check: Optional async callable() -> bool. If it returns True,
+                the subprocess is terminated.
+        """
         if timeout_seconds is None:
             timeout_seconds = self._settings.editly_timeout_seconds
 
@@ -551,8 +563,9 @@ class EditlyRenderer:
 
         start_time = time.monotonic()
         timed_out = False
+        cancelled = False
         exit_code: int | None = None
-        stderr_text = ""
+        stderr_lines: list[str] = []
 
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -562,30 +575,45 @@ class EditlyRenderer:
                 cwd=str(compiled.workspace),
             )
             try:
-                _stdout, stderr_bytes = await asyncio.wait_for(
-                    proc.communicate(),
+                stderr_lines = await asyncio.wait_for(
+                    self._stream_stderr(
+                        proc,
+                        progress_callback=progress_callback,
+                        cancel_check=cancel_check,
+                    ),
                     timeout=timeout_seconds,
                 )
                 exit_code = proc.returncode
-                stderr_text = stderr_bytes.decode(errors="replace")
             except TimeoutError:
                 timed_out = True
-                proc.kill()
-                await proc.wait()
+                await self._terminate_process(proc)
                 exit_code = proc.returncode
-                stderr_text = "TIMEOUT: Process killed after exceeding time limit"
+                stderr_lines.append(
+                    "TIMEOUT: Process killed after exceeding time limit"
+                )
+            except _CancelledByUserError:
+                cancelled = True
+                await self._terminate_process(proc)
+                exit_code = proc.returncode
+                stderr_lines.append("CANCELLED: Process killed by user request")
 
         except FileNotFoundError:
             timed_out = False
             exit_code = 127
-            stderr_text = (
+            stderr_lines = [
                 f"Editly binary not found: {self._settings.editly_bin}. "
                 "Ensure Node.js and Editly are installed."
-            )
+            ]
 
         elapsed = time.monotonic() - start_time
+        stderr_text = "\n".join(stderr_lines)
 
         log_path.write_text(stderr_text, encoding="utf-8")
+
+        if cancelled:
+            from app.renderers.base import RenderError as BaseRenderError
+
+            raise BaseRenderError("Render cancelled by user", exit_code=exit_code)
 
         output_exists = output_path.is_file()
 
@@ -617,3 +645,59 @@ class EditlyRenderer:
             duration_seconds=round(elapsed, 3),
             exit_code=exit_code or 0,
         )
+
+    async def _stream_stderr(
+        self,
+        proc: asyncio.subprocess.Process,
+        *,
+        progress_callback: Any | None = None,
+        cancel_check: Any | None = None,
+    ) -> list[str]:
+        """Read stderr line-by-line, invoking callbacks as appropriate."""
+        lines: list[str] = []
+        assert proc.stderr is not None
+
+        while True:
+            line_bytes = await proc.stderr.readline()
+            if not line_bytes:
+                break
+
+            line = line_bytes.decode(errors="replace").rstrip("\n").rstrip("\r")
+            lines.append(line)
+
+            if progress_callback is not None:
+                with contextlib.suppress(Exception):
+                    await progress_callback(line)
+
+            if cancel_check is not None:
+                try:
+                    should_cancel = await cancel_check()
+                    if should_cancel:
+                        raise _CancelledByUserError()
+                except _CancelledByUserError:
+                    raise
+                except Exception:
+                    pass
+
+        await proc.wait()
+        return lines
+
+    async def _terminate_process(
+        self,
+        proc: asyncio.subprocess.Process,
+        grace_period: float = 5.0,
+    ) -> None:
+        """SIGTERM with grace period, then SIGKILL if still alive."""
+        if proc.returncode is not None:
+            return
+
+        proc.terminate()
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=grace_period)
+        except TimeoutError:
+            proc.kill()
+            await proc.wait()
+
+
+class _CancelledByUserError(Exception):
+    """Internal signal: render was cancelled by user request."""

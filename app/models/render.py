@@ -50,24 +50,28 @@ _TRANSITIONS: dict[RenderStatus, frozenset[RenderStatus]] = {
     RenderStatus.FETCHING: frozenset(
         {
             RenderStatus.COMPILING,
+            RenderStatus.CANCELLED,
             RenderStatus.FAILED,
         }
     ),
     RenderStatus.COMPILING: frozenset(
         {
             RenderStatus.RENDERING,
+            RenderStatus.CANCELLED,
             RenderStatus.FAILED,
         }
     ),
     RenderStatus.RENDERING: frozenset(
         {
             RenderStatus.UPLOADING,
+            RenderStatus.CANCELLED,
             RenderStatus.FAILED,
         }
     ),
     RenderStatus.UPLOADING: frozenset(
         {
             RenderStatus.SUCCEEDED,
+            RenderStatus.CANCELLED,
             RenderStatus.FAILED,
         }
     ),
@@ -126,3 +130,28 @@ class RenderError(BaseModel):
 
     code: str
     message: str
+
+
+# ---------------------------------------------------------------------------
+# List / Pagination Models
+# ---------------------------------------------------------------------------
+
+
+class RenderListItem(BaseModel):
+    """Single item in the render list response."""
+
+    id: str
+    status: RenderStatus
+    progress: int = Field(default=0, ge=0, le=100)
+    created_at: datetime
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+
+
+class RenderListResponse(BaseModel):
+    """Paginated list of render jobs."""
+
+    items: list[RenderListItem]
+    total: int
+    offset: int
+    limit: int

@@ -19,6 +19,7 @@ class ErrorCode(StrEnum):
     NO_INPUT_DATA = "NO_INPUT_DATA"
     INPUT_FILE_MISSING = "INPUT_FILE_MISSING"
     QUEUE_UNAVAILABLE = "QUEUE_UNAVAILABLE"
+    RENDER_CANCELLED = "RENDER_CANCELLED"
     WORKER_UNEXPECTED_ERROR = "WORKER_UNEXPECTED_ERROR"
     INVALID_COMPOSITION = "INVALID_COMPOSITION"
 
@@ -62,6 +63,7 @@ def _register_defaults() -> None:
     register_exception(asyncio.TimeoutError, ErrorCode.RENDER_TIMEOUT)
     register_exception(OSError, ErrorCode.STORAGE_ERROR)
     register_exception(RenderServiceError, ErrorCode.RENDER_ERROR)
+    register_exception(asyncio.CancelledError, ErrorCode.RENDER_CANCELLED)
 
 
 import asyncio  # noqa: E402

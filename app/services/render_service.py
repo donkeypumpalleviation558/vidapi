@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -203,13 +204,20 @@ class RenderService:
         render_id: str,
         workspace: Path,
         session: AsyncSession,
+        *,
+        progress_callback: Any | None = None,
+        cancel_check: Any | None = None,
     ) -> None:
         """Stage 3: Execute renderer, generate poster, store artifacts.
 
         Raises RenderServiceError on render failures.
         """
         try:
-            artifact = await self._renderer.render(compiled)
+            artifact = await self._renderer.render(
+                compiled,
+                progress_callback=progress_callback,
+                cancel_check=cancel_check,
+            )
         except RenderError as exc:
             raise RenderServiceError(
                 str(exc), error_code="RENDER_ERROR", cause=exc
