@@ -27,6 +27,7 @@ from app.renderers.base import CompiledRender, RenderArtifact
 from app.services.render_service import RenderService
 from app.storage.local import LocalStorage
 from app.workers.render_worker import enqueue_render, run_render
+from app.workers.workspace import WorkspaceManager
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -97,6 +98,13 @@ def mock_render_service(tmp_path: Path) -> RenderService:
 
     service.execute_render = AsyncMock(side_effect=_execute)
     return service
+
+
+@pytest.fixture
+def worker_workspace_mgr(tmp_path: Path) -> WorkspaceManager:
+    workspace_root = tmp_path / "ws"
+    workspace_root.mkdir()
+    return WorkspaceManager(workspace_root=workspace_root)
 
 
 @pytest.fixture
@@ -283,9 +291,10 @@ class TestWorkerTask:
         worker_db_engine,
         worker_session_factory,
         worker_storage,
+        worker_workspace_mgr,
         sample_composition_dict,
     ):
-        """Worker task loads composition and calls execute_render."""
+        """Worker task loads composition and calls stage methods."""
         async with worker_session_factory() as session:
             render = await render_crud.create_render(session)
             render_id = render.id
@@ -297,31 +306,47 @@ class TestWorkerTask:
             )
 
         mock_service = MagicMock(spec=RenderService)
-        mock_service.execute_render = AsyncMock(return_value=MagicMock())
+
+        async def _validate(comp, rid, ws, sess):
+            return comp
+
+        async def _compile(comp, rid, ws, sess):
+            return MagicMock()
+
+        async def _render(comp, compiled, rid, ws, sess):
+            pass
+
+        mock_service.stage_validate_and_expand = AsyncMock(side_effect=_validate)
+        mock_service.stage_resolve_and_compile = AsyncMock(side_effect=_compile)
+        mock_service.stage_render_and_store = AsyncMock(side_effect=_render)
 
         ctx = {
             "session_factory": worker_session_factory,
             "render_service": mock_service,
+            "workspace_manager": worker_workspace_mgr,
         }
 
         await run_render(ctx, render_id)
 
-        mock_service.execute_render.assert_called_once()
-        call_args = mock_service.execute_render.call_args
-        assert call_args is not None
+        mock_service.stage_validate_and_expand.assert_called_once()
+        mock_service.stage_resolve_and_compile.assert_called_once()
+        mock_service.stage_render_and_store.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_worker_task_handles_missing_render(self, worker_session_factory):
+    async def test_worker_task_handles_missing_render(
+        self, worker_session_factory, worker_workspace_mgr
+    ):
         """Worker task logs and returns early for nonexistent render_id."""
         mock_service = MagicMock(spec=RenderService)
         ctx = {
             "session_factory": worker_session_factory,
             "render_service": mock_service,
+            "workspace_manager": worker_workspace_mgr,
         }
 
         await run_render(ctx, "render_nonexistent")
 
-        mock_service.execute_render.assert_not_called()
+        mock_service.stage_validate_and_expand.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_worker_task_handles_terminal_status(
@@ -329,6 +354,7 @@ class TestWorkerTask:
         worker_db_engine,
         worker_session_factory,
         worker_storage,
+        worker_workspace_mgr,
         sample_composition_dict,
     ):
         """Worker task skips renders already in terminal status."""
@@ -352,11 +378,12 @@ class TestWorkerTask:
         ctx = {
             "session_factory": worker_session_factory,
             "render_service": mock_service,
+            "workspace_manager": worker_workspace_mgr,
         }
 
         await run_render(ctx, render_id)
 
-        mock_service.execute_render.assert_not_called()
+        mock_service.stage_validate_and_expand.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_worker_task_marks_failed_on_exception(
@@ -364,6 +391,7 @@ class TestWorkerTask:
         worker_db_engine,
         worker_session_factory,
         worker_storage,
+        worker_workspace_mgr,
         sample_composition_dict,
     ):
         """Worker task marks render as failed on unexpected exception."""
@@ -378,11 +406,14 @@ class TestWorkerTask:
             )
 
         mock_service = MagicMock(spec=RenderService)
-        mock_service.execute_render = AsyncMock(side_effect=RuntimeError("boom"))
+        mock_service.stage_validate_and_expand = AsyncMock(
+            side_effect=RuntimeError("boom")
+        )
 
         ctx = {
             "session_factory": worker_session_factory,
             "render_service": mock_service,
+            "workspace_manager": worker_workspace_mgr,
         }
 
         await run_render(ctx, render_id)
@@ -399,6 +430,7 @@ class TestWorkerTask:
         worker_db_engine,
         worker_session_factory,
         worker_storage,
+        worker_workspace_mgr,
     ):
         """Worker marks render failed when input file is missing on disk."""
         async with worker_session_factory() as session:
@@ -412,6 +444,7 @@ class TestWorkerTask:
         ctx = {
             "session_factory": worker_session_factory,
             "render_service": mock_service,
+            "workspace_manager": worker_workspace_mgr,
         }
 
         await run_render(ctx, render_id)

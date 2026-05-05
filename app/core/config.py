@@ -66,6 +66,9 @@ class Settings(BaseSettings):
     ]
     ffprobe_timeout_seconds: int = 30
 
+    workspace_cleanup_enabled: bool = True
+    workspace_cleanup_keep_on_failure: bool = True
+
     editly_bin: str = "editly"
     editly_timeout_seconds: int = 600
     editly_fast_mode: bool = False
