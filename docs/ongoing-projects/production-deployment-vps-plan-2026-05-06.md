@@ -9,8 +9,9 @@ future hardening. The first production target is Docker Compose on this VPS:
 FastAPI API, ARQ worker, PostgreSQL, Redis, and S3-compatible artifact storage
 using MinIO or an external object store.
 
-This document is a planning artifact only. It does not start services, create
-secrets, run migrations, or expose the API.
+This document started as the deployment plan and now also records the production
+bring-up completed on this server. The status sections below reflect verified
+server state as of 2026-05-06.
 
 ## Project Understanding
 
@@ -134,44 +135,67 @@ these production boundaries:
 
 ## Known Gaps To Resolve Before Live Traffic
 
-- `docker-compose.prod.yml` publishes API port `8000` and MinIO ports `9000` and
-  `9001`; production should avoid exposing internal services directly.
+- `docker-compose.prod.yml` still publishes API port `8000` and MinIO ports
+  `9000` and `9001` by default. The committed `docker-compose.vps.yml` override
+  fixes this on this server by clearing those host port mappings, so future VPS
+  runs must include both Compose files.
 - Redis TLS is disabled in the provided production-like Compose template because
   it runs on a private bridge network. That is acceptable only for single-host
   private networking; external Redis should use `rediss://`.
 - The generic `scripts/smoke-test.sh` does not send `X-API-Key`; production
   verification needs authenticated curl steps or a production-aware smoke script.
-- MinIO bucket creation is documented but not automated.
-- There is no committed reverse proxy config yet.
+- MinIO bucket creation has been performed manually on this server but is not
+  automated.
+- Reverse proxy routing is committed as Traefik labels in `docker-compose.vps.yml`
+  for this Coolify server; there is still no standalone Nginx/Caddy/Traefik
+  config for other hosts.
 - There is no committed VPS-specific backup, restore, or rollback runbook yet.
 - The health endpoint returns service health details but should still be exposed
   through TLS and rate-limited at the proxy if public.
+- The running API currently reports application version `0.1.33`; the repository
+  has since been bumped and pushed to `0.1.35`, so the next maintenance deploy
+  should rebuild and replace the API and worker images from current `main`.
 
-## Open Decisions
+## Resolved Decisions For This VPS
 
-- Which public hostname will serve the API?
-- Should durable artifacts use bundled MinIO for launch, or an external
-  S3-compatible provider?
-- Which reverse proxy should this VPS use?
-- What are the VPS CPU, RAM, and disk limits, and what render concurrency should
-  they support?
-- Who needs raw API keys, and how should they be distributed and rotated?
-- What backup retention period is required for render metadata and artifacts?
+- Public hostname: `vidapi.aiwithapex.com`.
+- Reverse proxy: existing Coolify Traefik proxy on the external `coolify`
+  network.
+- Initial durable artifact storage: bundled MinIO through the S3 adapter.
+- API exposure: API is reachable only through Traefik/TLS; it does not publish a
+  host port directly.
+- Internal service names: unique aliases `vidapi-postgres`, `vidapi-redis`, and
+  `vidapi-minio` avoid collisions on shared Docker networks.
+- API key storage: `.env.production` stores only SHA-256 key hashes; raw operator
+  key material is kept in ignored local operator files.
+
+## Remaining Decisions
+
+- What backup retention period is required for PostgreSQL metadata and MinIO
+  artifacts?
+- Should MinIO stay on this VPS after launch, or should artifacts move to an
+  external S3-compatible provider?
+- What render concurrency should this VPS support after real workload testing?
+- What API key rotation cadence should operators follow?
 
 ## Proposed Next Step
 
-After review, the next implementation pass should create or adjust the concrete
-deployment files needed for this VPS: production `.env` generation steps,
-reverse proxy config, bucket provisioning, authenticated smoke testing, and a
-first-run deployment runbook.
+Create a VPS runbook that covers authenticated smoke testing, backup and restore,
+rollback, image rebuild/redeploy, and API key rotation. Then rebuild and replace
+the running API and worker images from current `main` so the live service reports
+the repository version `0.1.35`.
 
 ## VPS Implementation Status
 
 Updated: 2026-05-06
 
+Last verified: 2026-05-06 17:24 UTC
+
 Completed on this VPS:
 
 - Verified Docker Engine and Docker Compose are installed and usable through the
+  `docker` group. The current non-login shell does not include the `docker`
+  group in `id`, but `sg docker -c ...` works because `vidapi` is listed in the
   `docker` group.
 - Audited existing containers and host ports. Coolify/Traefik already owns
   public `80`, `443`, `8080`, and Coolify owns `8000`, so VidAPI must not bind
@@ -187,12 +211,24 @@ Completed on this VPS:
   plus the VPS override.
 - Created the configured MinIO bucket.
 - Ran Alembic migrations to revision `008 (head)`.
+- Started the full production Compose stack with API, worker, PostgreSQL, Redis,
+  and MinIO.
+- Committed and pushed the deployment support changes to `origin/main` as
+  `b679d7e Prepare VPS deployment support`.
+- Bumped repository metadata during bring-up to version `0.1.34`; the current
+  source metadata is `0.1.35`.
+- Installed `uv` and `uvx` version `0.11.9` under
+  `/home/vidapi/.npm-global/bin` so `scripts/dev.sh test ...` works on this
+  server.
 
 Current state:
 
 - Long-running VidAPI containers: `api`, `worker`, `postgres`, `redis`, and
   `minio`.
-- No VidAPI service is publishing host ports.
+- All five VidAPI containers are healthy.
+- No VidAPI service is publishing host ports. Compose shows only container
+  ports: API `8000/tcp`, PostgreSQL `5432/tcp`, Redis `6379/tcp`, and MinIO
+  `9000-9001/tcp`.
 - The API is routed through the existing Coolify Traefik proxy at
   `https://vidapi.aiwithapex.com`.
 - The API container is attached to both the private `vidapi-prod` network and
@@ -203,8 +239,21 @@ Current state:
   use generic names on the proxy network.
 - Public `/v1/health` returns healthy database and Redis status.
 - Authenticated `/v1/ops/metrics` returns Prometheus text over HTTPS.
+- Unauthenticated `/v1/ops/metrics` returns `401`.
+- Authenticated `/v1/renders` returns the existing successful smoke render.
 - An authenticated one-second `ffmpeg-native` render completed successfully over
   the public hostname and downloaded as `video/mp4`.
+- A reported Cloudflare `1010` block from another server account was not
+  reproduced from the `vidapi` account: authenticated protected endpoints worked
+  through the public hostname over both IPv4 and IPv6, and with common curl,
+  Python, Go, and browser-like user agents.
+- Redis authentication is active; unauthenticated `redis-cli ping` returns
+  `NOAUTH`, while authenticated ping returns `PONG`.
+- The MinIO bucket `vidapi-renders` exists, is private, and currently contains
+  the smoke render artifacts.
+- The running public health response reports application version `0.1.33`; the
+  source tree is now at `0.1.35`, so the running images predate the latest
+  version bump.
 
 Production fix applied during bring-up:
 
@@ -214,3 +263,33 @@ Production fix applied during bring-up:
   datetimes consistently with the existing schema.
 - API startup logging no longer emits the full Redis URL with credentials; it
   logs only the Redis scheme, host, port, and DB number.
+
+Verification commands run on 2026-05-06:
+
+```bash
+sg docker -c "docker compose --env-file .env.production -f docker-compose.prod.yml -f docker-compose.vps.yml ps"
+curl -fsS https://vidapi.aiwithapex.com/v1/health
+curl -fsS -o /dev/null -w "%{http_code}\n" https://vidapi.aiwithapex.com/v1/ops/metrics
+sg docker -c "docker exec vidapi-api-1 alembic current"
+sg docker -c "docker exec vidapi-postgres-1 pg_isready -U vidapi -d vidapi"
+```
+
+Authenticated checks were also run using the ignored
+`.env.production.operator` file:
+
+```bash
+curl -fsS -H "X-API-Key: ${VIDAPI_API_KEY}" https://vidapi.aiwithapex.com/v1/ops/metrics
+curl -fsS -H "X-API-Key: ${VIDAPI_API_KEY}" https://vidapi.aiwithapex.com/v1/renders
+```
+
+If a same-host agent receives a Cloudflare-generated `1010` page, capture the
+UTC timestamp, public egress IP, `cf-ray`, and `cf-error-type` response headers.
+That response is generated before Traefik and will not appear in VidAPI origin
+logs. Same-host agents can also bypass Cloudflare for diagnostics through local
+Traefik while preserving the production hostname:
+
+```bash
+curl --resolve vidapi.aiwithapex.com:443:127.0.0.1 \
+  -H "X-API-Key: ${VIDAPI_API_KEY}" \
+  https://vidapi.aiwithapex.com/v1/renders
+```
