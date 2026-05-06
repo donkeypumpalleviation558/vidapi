@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from typing import Any, cast
 
 from sqlalchemy import func
@@ -10,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
 from app.db.models import Render
+from app.db.time import utcnow_naive
 from app.models.output_artifacts import (
     StoredCaptionMetadata,
     StoredOutputMetadata,
@@ -100,7 +100,7 @@ async def update_render_status(
     current.transition_to(new_status)
 
     render.status = new_status.value
-    render.updated_at = datetime.now(tz=UTC)
+    render.updated_at = utcnow_naive()
 
     if stage is not None:
         render.stage = stage
@@ -112,10 +112,10 @@ async def update_render_status(
         render.error_message = error_message
 
     if new_status == RenderStatus.FETCHING and render.started_at is None:
-        render.started_at = datetime.now(tz=UTC)
+        render.started_at = utcnow_naive()
 
     if new_status.is_terminal:
-        render.completed_at = datetime.now(tz=UTC)
+        render.completed_at = utcnow_naive()
         if new_status == RenderStatus.SUCCEEDED:
             render.progress = 100
 
@@ -294,8 +294,8 @@ async def set_cancel_requested(
     if render.cancel_requested_at is not None:
         return render
 
-    render.cancel_requested_at = datetime.now(tz=UTC)
-    render.updated_at = datetime.now(tz=UTC)
+    render.cancel_requested_at = utcnow_naive()
+    render.updated_at = utcnow_naive()
 
     session.add(render)
     await _commit_and_refresh(session, render)
@@ -317,7 +317,7 @@ async def update_render_progress(
 
     clamped = max(0, min(100, progress))
     render.progress = clamped
-    render.updated_at = datetime.now(tz=UTC)
+    render.updated_at = utcnow_naive()
 
     session.add(render)
     await _commit_and_refresh(session, render)
@@ -362,7 +362,7 @@ async def update_render_paths(
     if renderer is not None:
         render.renderer = renderer
 
-    render.updated_at = datetime.now(tz=UTC)
+    render.updated_at = utcnow_naive()
 
     session.add(render)
     await _commit_and_refresh(session, render)
@@ -389,7 +389,7 @@ async def update_render_output_metadata(
     render.output_duration_seconds = metadata.duration_seconds
     render.output_frame_count = metadata.frame_count
     render.output_manifest_path = metadata.manifest_path
-    render.updated_at = datetime.now(tz=UTC)
+    render.updated_at = utcnow_naive()
 
     session.add(render)
     await _commit_and_refresh(session, render)
@@ -411,7 +411,7 @@ async def clear_render_output_metadata(
     render.output_duration_seconds = None
     render.output_frame_count = None
     render.output_manifest_path = None
-    render.updated_at = datetime.now(tz=UTC)
+    render.updated_at = utcnow_naive()
 
     session.add(render)
     await _commit_and_refresh(session, render)
@@ -437,7 +437,7 @@ async def update_render_caption_metadata(
     render.caption_sidecar_filename = metadata.sidecar_filename
     render.caption_cue_count = metadata.cue_count
     render.caption_burned_in = metadata.burned_in
-    render.updated_at = datetime.now(tz=UTC)
+    render.updated_at = utcnow_naive()
 
     session.add(render)
     await _commit_and_refresh(session, render)
@@ -460,7 +460,7 @@ async def clear_render_caption_metadata(
     render.caption_sidecar_filename = None
     render.caption_cue_count = None
     render.caption_burned_in = None
-    render.updated_at = datetime.now(tz=UTC)
+    render.updated_at = utcnow_naive()
 
     session.add(render)
     await _commit_and_refresh(session, render)
@@ -484,7 +484,7 @@ async def update_render_poster_metadata(
     render.poster_timestamp_seconds = metadata.timestamp_seconds
     render.poster_media_type = metadata.media_type
     render.poster_filename = metadata.filename
-    render.updated_at = datetime.now(tz=UTC)
+    render.updated_at = utcnow_naive()
 
     session.add(render)
     await _commit_and_refresh(session, render)
@@ -505,7 +505,7 @@ async def clear_render_poster_metadata(
     render.poster_timestamp_seconds = None
     render.poster_media_type = None
     render.poster_filename = None
-    render.updated_at = datetime.now(tz=UTC)
+    render.updated_at = utcnow_naive()
 
     session.add(render)
     await _commit_and_refresh(session, render)
@@ -523,7 +523,7 @@ async def update_render_renderer(
         return None
 
     render.renderer = renderer
-    render.updated_at = datetime.now(tz=UTC)
+    render.updated_at = utcnow_naive()
 
     session.add(render)
     await _commit_and_refresh(session, render)

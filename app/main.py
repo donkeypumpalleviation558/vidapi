@@ -5,6 +5,7 @@ import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from contextlib import asynccontextmanager
 from typing import Any
+from urllib.parse import urlsplit
 
 import structlog
 from fastapi import FastAPI, Request, Response, Security
@@ -46,6 +47,16 @@ class VidAPIFastAPI(FastAPI):
         return _custom_openapi(self)
 
 
+def _redis_log_fields(redis_url: str) -> dict[str, Any]:
+    parsed = urlsplit(redis_url)
+    return {
+        "redis_scheme": parsed.scheme,
+        "redis_host": parsed.hostname,
+        "redis_port": parsed.port,
+        "redis_db": parsed.path.lstrip("/") or None,
+    }
+
+
 async def _prepare_database() -> None:
     settings = get_settings()
     try:
@@ -70,7 +81,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     if settings.render_mode == "async":
         await create_arq_pool()
-        await logger.ainfo("redis_pool_created", redis_url=settings.redis_url)
+        await logger.ainfo(
+            "redis_pool_created",
+            **_redis_log_fields(settings.redis_url),
+        )
 
     await logger.ainfo(
         "startup",

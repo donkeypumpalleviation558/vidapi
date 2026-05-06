@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import os
 import time
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlmodel import Field, SQLModel
+
+from app.db.time import utcnow_naive
 
 
 def _base36(n: int) -> str:
@@ -34,10 +36,6 @@ def _generate_version_id() -> str:
     return f"tver_{encoded}"
 
 
-def _utcnow() -> datetime:
-    return datetime.now(tz=UTC)
-
-
 class Template(SQLModel, table=True):
     __tablename__ = "templates"
 
@@ -47,8 +45,8 @@ class Template(SQLModel, table=True):
     active_version_id: str | None = Field(default=None)
     variable_schema: str | None = Field(default=None)
     is_deleted: bool = Field(default=False, index=True)
-    created_at: datetime = Field(default_factory=_utcnow)
-    updated_at: datetime = Field(default_factory=_utcnow)
+    created_at: datetime = Field(default_factory=utcnow_naive)
+    updated_at: datetime = Field(default_factory=utcnow_naive)
 
 
 class TemplateVersion(SQLModel, table=True):
@@ -59,4 +57,4 @@ class TemplateVersion(SQLModel, table=True):
     version_number: int = Field(ge=1)
     composition: str
     variable_schema: str | None = Field(default=None)
-    created_at: datetime = Field(default_factory=_utcnow)
+    created_at: datetime = Field(default_factory=utcnow_naive)

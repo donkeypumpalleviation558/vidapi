@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlmodel import Field, SQLModel
 
-
-def _utcnow() -> datetime:
-    return datetime.now(tz=UTC)
+from app.db.time import utcnow_naive
 
 
 class WebhookAttempt(SQLModel, table=True):
@@ -19,8 +17,8 @@ class WebhookAttempt(SQLModel, table=True):
     status_code: int | None = Field(default=None)
     response_body_excerpt: str | None = Field(default=None)
     attempt_number: int = Field(default=1)
-    scheduled_at: datetime = Field(default_factory=_utcnow)
+    scheduled_at: datetime = Field(default_factory=utcnow_naive)
     delivered_at: datetime | None = Field(default=None)
     error: str | None = Field(default=None)
-    created_at: datetime = Field(default_factory=_utcnow)
-    updated_at: datetime = Field(default_factory=_utcnow)
+    created_at: datetime = Field(default_factory=utcnow_naive)
+    updated_at: datetime = Field(default_factory=utcnow_naive)

@@ -4,6 +4,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     make \
     g++ \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    librsvg2-dev \
+    libpixman-1-dev \
     libxi-dev \
     libgl1-mesa-dev \
     pkg-config \
@@ -19,6 +25,8 @@ COPY --from=node-base /usr/local/bin/node /usr/local/bin/node
 COPY --from=node-base /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -sf /usr/local/lib/node_modules/editly/cli.js /usr/local/bin/editly \
     && chmod +x /usr/local/lib/node_modules/editly/cli.js \
+    && ln -sf /usr/local/lib/node_modules/hyperframes/dist/cli.js /usr/local/bin/hyperframes \
+    && chmod +x /usr/local/lib/node_modules/hyperframes/dist/cli.js \
     && ln -sf /usr/local/bin/node /usr/local/bin/nodejs
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -49,7 +57,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libdrm2 \
     libgbm1 \
     libgtk-3-0 \
+    libcairo2 \
     libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libjpeg62-turbo \
+    libgif7 \
+    librsvg2-2 \
+    libpixman-1-0 \
     libasound2 \
     xvfb \
     xauth \

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
+from app.db.time import utcnow_naive
 from app.db.template_models import Template, TemplateVersion
 
 
@@ -134,7 +133,7 @@ async def update_template(
         msg = f"Template {template_id} not found"
         raise ValueError(msg)
 
-    now = datetime.now(tz=UTC)
+    now = utcnow_naive()
     new_version: TemplateVersion | None = None
 
     if name is not None:
@@ -198,7 +197,7 @@ async def soft_delete_template(
         raise ValueError(msg)
 
     template.is_deleted = True
-    template.updated_at = datetime.now(tz=UTC)
+    template.updated_at = utcnow_naive()
     session.add(template)
     await _commit_and_refresh(session, template)
     return template

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import and_, case, func, or_
@@ -9,6 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
+from app.db.time import as_utc_naive, utcnow_naive
 from app.db.webhook_models import WebhookAttempt
 
 
@@ -45,7 +46,7 @@ async def create_attempt(
         event=event,
         url=url,
         attempt_number=attempt_number,
-        scheduled_at=scheduled_at or datetime.now(tz=UTC),
+        scheduled_at=as_utc_naive(scheduled_at) if scheduled_at else utcnow_naive(),
     )
     session.add(attempt)
     await _commit_and_refresh(session, attempt)
@@ -68,7 +69,7 @@ async def update_attempt_result(
     if attempt is None:
         return None
 
-    now = datetime.now(tz=UTC)
+    now = utcnow_naive()
     attempt.delivered_at = now
     attempt.updated_at = now
 

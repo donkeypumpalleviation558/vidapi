@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import os
 import time
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlmodel import Field, SQLModel
 
+from app.db.time import utcnow_naive
 from app.models.render import RenderStatus
 
 
@@ -31,10 +32,6 @@ def _base36(n: int) -> str:
         n, rem = divmod(n, 36)
         result.append(chars[rem])
     return "".join(reversed(result))
-
-
-def _utcnow() -> datetime:
-    return datetime.now(tz=UTC)
 
 
 class Render(SQLModel, table=True):
@@ -81,7 +78,7 @@ class Render(SQLModel, table=True):
 
     cancel_requested_at: datetime | None = Field(default=None)
 
-    created_at: datetime = Field(default_factory=_utcnow)
-    updated_at: datetime = Field(default_factory=_utcnow)
+    created_at: datetime = Field(default_factory=utcnow_naive)
+    updated_at: datetime = Field(default_factory=utcnow_naive)
     started_at: datetime | None = Field(default=None)
     completed_at: datetime | None = Field(default=None)
